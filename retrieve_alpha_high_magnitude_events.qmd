@@ -5,6 +5,8 @@ editor: visual
 ---
 
 ```{r}
+# delete all objects in the environment
+rm(list = ls())
 library(ETAS.inlabru)
 library(ggplot2)
 library(gridExtra)
@@ -22,6 +24,8 @@ INLA::inla.setOption(num.threads = num.cores)
 set.seed(123)
 ```
 
+# Set True ETAS Parameters
+
 ```{r}
 set.seed(111)
 # set true ETAS parameters
@@ -33,7 +37,7 @@ M0 <- 2.5
 # set starting time of the synthetic catalogue
 T1 <- 0
 # set end time of the synthetic catalogue
-T2 <- 1000
+T2 <- 365
 ```
 
 ```{r}
@@ -60,11 +64,12 @@ generate_synthetic_catalogue <- function(
 }
 ```
 
+# Generate Synthetic Catalogues
 
 ```{r}
 # create a dataframe containing the known events
 known.events.df.1 <- data.frame(
-  ts = c(500),
+  ts = c(T2*0.5),
   magnitudes = c(5)
 )
 # gerate the synthetic catalogue-1
@@ -78,7 +83,7 @@ synth.cat.df.1 <- generate_synthetic_catalogue(
 )
 # create a dataframe containing the known events
 known.events.df.2 <- data.frame(
-  ts = c(500),
+  ts = c(T2*0.5),
   magnitudes = c(6.7)
 )
 # generate the catalogue-2
@@ -92,7 +97,7 @@ synth.cat.df.2 <- generate_synthetic_catalogue(
 )
 # create a dataframe containing the known events
 known.events.df.3 <- data.frame(
-  ts = c(300,600),
+  ts = c(T2*0.5, T2*0.75),
   magnitudes = c(5, 6.7)
 )
 # generate the catalogue-3
@@ -106,7 +111,7 @@ synth.cat.df.3 <- generate_synthetic_catalogue(
 )
 # create a dataframe containing the known events
 known.events.df.4 <- data.frame(
-  ts = c(300, 600),
+  ts = c(T2*0.5, T2*0.75),
   magnitudes = c(6.7, 6.7)
 )
 # generate the catalogue-4
@@ -120,8 +125,8 @@ synth.cat.df.4 <- generate_synthetic_catalogue(
 )
 # create a dataframe containing the known events
 known.events.df.5 <- data.frame(
-  ts = c(500, 750),
-  magnitudes = c(7., 5)
+  ts = c(T2*0.25, T2*0.5, T2*0.75),
+  magnitudes = c(5, 6.7, 5)
 )
 # generate the catalogue-5
 synth.cat.df.5 <- generate_synthetic_catalogue(
@@ -139,6 +144,8 @@ synth.cat.df.5 <- generate_synthetic_catalogue(
 colnames(synth.cat.df.1)
 # [1] "ts" "magnitudes" "gen"
 ```
+
+# Plot Synthetic Catalogues
 
 ```{r}
 # create a function to plot the synthetic catalogues
@@ -166,8 +173,11 @@ plt.5 <- plot_synthetic_catalogue(synth.cat.df.5, "Synthetic Catalogue 5")
 grid.arrange(plt.1, plt.2, plt.3, plt.4, plt.5, ncol = 1)
 ```
 
+# Calculate the Number of Events
+
 ```{r}
-# calculate the number of events with magnitude (5<= M < 5.5) (5.5<= M < 6) (6<= M < 6.5) (6.5<= M < 7) (7<= M)
+# calculate the number of events with magnitude (5<= M < 5.5) 
+# (5.5<= M < 6) (6<= M < 6.5) (6.5<= M < 7) (7<= M)
 
 num.events.5.5.5 <- c(
   nrow(synth.cat.df.1[synth.cat.df.1$magnitudes >= 5 & synth.cat.df.1$magnitudes < 5.5, ]),
@@ -211,6 +221,8 @@ num.events.gt.7 <- c(
 
 ```
 
+# Plot the Number of Events
+
 ```{r}
 # plot a grouped bar chart
 df <- data.frame(
@@ -233,5 +245,102 @@ ggplot(df_long, aes(x = factor(catalogue), y = count, fill = event_type)) +
   labs(x = "Catalogue", y = "Number of Events", fill = "Event Type") +
   theme_minimal() +
   # rename the legend labels
-  scale_fill_discrete(name = "Event Type", labels = c("5 <= M < 5.5", "5.5 <= M < 6", "6 <= M < 6.5", "6.5 <= M < 7", "7 <= M"))
+  scale_fill_brewer(name = "Event Type", labels = c("5 <= M < 5.5", "5.5 <= M < 6", "6 <= M < 6.5", "6.5 <= M < 7", "7 <= M"),palette = "PuBu")
+
+```
+
+# Prepare the Data for Model Fitting
+```{r}
+# sort catalogue by occurrence time
+synth.cat.df.1 <- synth.cat.df.1[order(synth.cat.df.1$ts), ]
+synth.cat.df.2 <- synth.cat.df.2[order(synth.cat.df.2$ts), ]
+synth.cat.df.3 <- synth.cat.df.3[order(synth.cat.df.3$ts), ]
+synth.cat.df.4 <- synth.cat.df.4[order(synth.cat.df.4$ts), ]
+synth.cat.df.5 <- synth.cat.df.5[order(synth.cat.df.5$ts), ]
+# add event identifier
+synth.cat.df.1$idx.p <- seq_len(nrow(synth.cat.df.1))
+synth.cat.df.2$idx.p <- seq_len(nrow(synth.cat.df.2))
+synth.cat.df.3$idx.p <- seq_len(nrow(synth.cat.df.3))
+synth.cat.df.4$idx.p <- seq_len(nrow(synth.cat.df.4))
+synth.cat.df.5$idx.p <- seq_len(nrow(synth.cat.df.5))
+
+# create a list of synthetic catalogues
+synth.cat.list <- list(
+  synth.cat.df.1,
+  synth.cat.df.2,
+  synth.cat.df.3,
+  synth.cat.df.4,
+  synth.cat.df.5
+)
+```
+
+# Model Fitting
+
+```{r}
+# set copula transformations list
+link.f <- list(
+  mu = \(x) gamma_t(x, 0.3, 0.6),
+  K = \(x) unif_t(x, 0, 10),
+  alpha = \(x) unif_t(x, 0, 10),
+  c_ = \(x) unif_t(x, 0, 10),
+  p = \(x) unif_t(x, 1, 10)
+)
+
+# set inverse copula transformations list
+inv.link.f <- list(
+  mu = \(x) inv_gamma_t(x, 0.3, 0.6),
+  K = \(x) inv_unif_t(x, 0, 10),
+  alpha = \(x) inv_unif_t(x, 0, 10),
+  c_ = \(x) inv_unif_t(x, 0, 10),
+  p = \(x) inv_unif_t(x, 1, 10)
+)
+
+# set up list of initial values
+th.init <- list(
+  th.mu = inv.link.f$mu(0.5),
+  th.K = inv.link.f$K(0.1),
+  th.alpha = inv.link.f$alpha(1),
+  th.c = inv.link.f$c_(0.1),
+  th.p = inv.link.f$p(1.1)
+)
+
+# set up list of bru options
+bru.opt.list <- list(
+  bru_verbose = 3, # type of visual output
+  bru_max_iter = 70, # maximum number of iterations
+  # bru_method = list(max_step = 0.5),
+  bru_initial = th.init
+) # parameters initial values
+```
+
+```{r}
+# create a list of model fitting results
+fit.list <- lapply(synth.cat.list, function(synth.cat.df) {
+  # fit the model
+  fit <- Temporal.ETAS(
+    total.data = synth.cat.df,
+    M0 = M0,
+    T1 = T1,
+    T2 = T2,
+    link.functions = link.f,
+    coef.t. = 1,
+    delta.t. = 0.1,
+    N.max. = 5,
+    bru.opt = bru.opt.list
+  )
+  return(fit)
+})
+```
+
+```{r}
+input_list <- list(
+  model.fit = fit.list[[1]],
+  link.functions = link.f
+)
+
+# get marginal posterior information
+post.list <- get_posterior_param(input.list = input_list)
+
+# plot marginal posteriors
+post.list$post.plot
 ```
