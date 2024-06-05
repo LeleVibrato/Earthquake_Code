@@ -1,0 +1,160 @@
+---
+title: "Investigating alpha Estimation with Varied High Magnitude Events"
+format: html
+editor: visual
+---
+
+```{r}
+library(ETAS.inlabru)
+library(ggplot2)
+```
+
+```{r}
+num.cores <- 6
+future::plan(future::multisession, workers = num.cores)
+INLA::inla.setOption(num.threads = num.cores)
+```
+
+```{r}
+set.seed(123)
+```
+
+```{r}
+set.seed(111)
+# set true ETAS parameters
+true.param <- list(mu = 0.30106014, K = 0.13611399, alpha = 2.43945301, c = 0.07098607, p = 1.17838741)
+# set magnitude distribution parameter
+beta.p <- 2.353157
+# set cutoff magnitude
+M0 <- 2.5
+# set starting time of the synthetic catalogue
+T1 <- 0
+# set end time of the synthetic catalogue
+T2 <- 1000
+```
+
+```{r}
+# a function to generate synthetic catalogues
+generate_synthetic_catalogue <- function(
+  theta,
+  beta.p,
+  M0,
+  T1,
+  T2,
+  Ht = NULL
+) {
+  # generate the catalogue-1 - it returns a list of data.frames
+  synth.cat.list <- generate_temporal_ETAS_synthetic(
+    theta = theta,
+    beta.p = beta.p,
+    M0 = M0,
+    T1 = T1,
+    T2 = T2,
+    Ht = Ht
+  )
+  synth.cat.df <- do.call(rbind, synth.cat.list)
+  return(synth.cat.df)
+}
+```
+
+
+```{r}
+# create a dataframe containing the known events
+known.events.df.1 <- data.frame(
+  ts = c(500),
+  magnitudes = c(5)
+)
+# gerate the synthetic catalogue-1
+synth.cat.df.1 <- generate_synthetic_catalogue(
+  theta = true.param,
+  beta.p = beta.p,
+  M0 = M0,
+  T1 = T1,
+  T2 = T2,
+  Ht = known.events.df.1
+)
+# create a dataframe containing the known events
+known.events.df.2 <- data.frame(
+  ts = c(500),
+  magnitudes = c(6.7)
+)
+# generate the catalogue-2
+synth.cat.df.2 <- generate_synthetic_catalogue(
+  theta = true.param,
+  beta.p = beta.p,
+  M0 = M0,
+  T1 = T1,
+  T2 = T2,
+  Ht = known.events.df.2
+)
+# create a dataframe containing the known events
+known.events.df.3 <- data.frame(
+  ts = c(300,600),
+  magnitudes = c(5, 6.7)
+)
+# generate the catalogue-3
+synth.cat.df.3 <- generate_synthetic_catalogue(
+  theta = true.param,
+  beta.p = beta.p,
+  M0 = M0,
+  T1 = T1,
+  T2 = T2,
+  Ht = known.events.df.3
+)
+# create a dataframe containing the known events
+known.events.df.4 <- data.frame(
+  ts = c(300, 600),
+  magnitudes = c(6.7, 6.7)
+)
+# generate the catalogue-4
+synth.cat.df.4 <- generate_synthetic_catalogue(
+  theta = true.param,
+  beta.p = beta.p,
+  M0 = M0,
+  T1 = T1,
+  T2 = T2,
+  Ht = known.events.df.4
+)
+# create a dataframe containing the known events
+known.events.df.5 <- data.frame(
+  ts = c(500, 750),
+  magnitudes = c(7., 5)
+)
+# generate the catalogue-5
+synth.cat.df.5 <- generate_synthetic_catalogue(
+  theta = true.param,
+  beta.p = beta.p,
+  M0 = M0,
+  T1 = T1,
+  T2 = T2,
+  Ht = known.events.df.5
+)
+```
+
+```{r}
+# find column names
+colnames(synth.cat.df.1)
+# [1] "ts" "magnitudes" "gen"
+```
+
+```{r}
+# create a function to plot the synthetic catalogues
+plot_synthetic_catalogue <- function(synth.cat.df, title) {
+  plt <- ggplot(synth.cat.df, aes(x = ts, y = magnitudes)) +
+    geom_point() +
+    # mark the events with magnitude greater than 4.5
+    geom_point(data = synth.cat.df[synth.cat.df$magnitudes >= 5, ], aes(x = ts, y = magnitudes), color = "red") +
+    theme_minimal() +
+    labs(title = title)
+  return(plt)
+}
+```
+
+```{r}
+# plot the synthetic catalogues
+plt.1 <- plot_synthetic_catalogue(synth.cat.df.1, "Synthetic Catalogue 1")
+plt.2 <- plot_synthetic_catalogue(synth.cat.df.2, "Synthetic Catalogue 2")
+plt.3 <- plot_synthetic_catalogue(synth.cat.df.3, "Synthetic Catalogue 3")
+plt.4 <- plot_synthetic_catalogue(synth.cat.df.4, "Synthetic Catalogue 4")
+plt.5 <- plot_synthetic_catalogue(synth.cat.df.5, "Synthetic Catalogue 5")
+```
