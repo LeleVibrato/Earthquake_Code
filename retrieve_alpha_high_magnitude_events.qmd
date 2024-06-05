@@ -7,6 +7,9 @@ editor: visual
 ```{r}
 library(ETAS.inlabru)
 library(ggplot2)
+library(gridExtra)
+library(reshape2)
+library(tidyr)
 ```
 
 ```{r}
@@ -142,9 +145,11 @@ colnames(synth.cat.df.1)
 plot_synthetic_catalogue <- function(synth.cat.df, title) {
   plt <- ggplot(synth.cat.df, aes(x = ts, y = magnitudes)) +
     geom_point() +
-    # mark the events with magnitude greater than 4.5
+    # mark the events with magnitude greater than 5
     geom_point(data = synth.cat.df[synth.cat.df$magnitudes >= 5, ], aes(x = ts, y = magnitudes), color = "red") +
     theme_minimal() +
+    xlab("Time [days]") +
+    ylab("Magnitude") +
     labs(title = title)
   return(plt)
 }
@@ -157,4 +162,76 @@ plt.2 <- plot_synthetic_catalogue(synth.cat.df.2, "Synthetic Catalogue 2")
 plt.3 <- plot_synthetic_catalogue(synth.cat.df.3, "Synthetic Catalogue 3")
 plt.4 <- plot_synthetic_catalogue(synth.cat.df.4, "Synthetic Catalogue 4")
 plt.5 <- plot_synthetic_catalogue(synth.cat.df.5, "Synthetic Catalogue 5")
+# arrange the plots in a column
+grid.arrange(plt.1, plt.2, plt.3, plt.4, plt.5, ncol = 1)
+```
+
+```{r}
+# calculate the number of events with magnitude (5<= M < 5.5) (5.5<= M < 6) (6<= M < 6.5) (6.5<= M < 7) (7<= M)
+
+num.events.5.5.5 <- c(
+  nrow(synth.cat.df.1[synth.cat.df.1$magnitudes >= 5 & synth.cat.df.1$magnitudes < 5.5, ]),
+  nrow(synth.cat.df.2[synth.cat.df.2$magnitudes >= 5 & synth.cat.df.2$magnitudes < 5.5, ]),
+  nrow(synth.cat.df.3[synth.cat.df.3$magnitudes >= 5 & synth.cat.df.3$magnitudes < 5.5, ]),
+  nrow(synth.cat.df.4[synth.cat.df.4$magnitudes >= 5 & synth.cat.df.4$magnitudes < 5.5, ]),
+  nrow(synth.cat.df.5[synth.cat.df.5$magnitudes >= 5 & synth.cat.df.5$magnitudes < 5.5, ])
+)
+
+num.events.5.5.6 <- c(
+  nrow(synth.cat.df.1[synth.cat.df.1$magnitudes >= 5.5 & synth.cat.df.1$magnitudes < 6, ]),
+  nrow(synth.cat.df.2[synth.cat.df.2$magnitudes >= 5.5 & synth.cat.df.2$magnitudes < 6, ]),
+  nrow(synth.cat.df.3[synth.cat.df.3$magnitudes >= 5.5 & synth.cat.df.3$magnitudes < 6, ]),
+  nrow(synth.cat.df.4[synth.cat.df.4$magnitudes >= 5.5 & synth.cat.df.4$magnitudes < 6, ]),
+  nrow(synth.cat.df.5[synth.cat.df.5$magnitudes >= 5.5 & synth.cat.df.5$magnitudes < 6, ])
+)
+
+num.events.6.6.5 <- c(
+  nrow(synth.cat.df.1[synth.cat.df.1$magnitudes >= 6 & synth.cat.df.1$magnitudes < 6.5, ]),
+  nrow(synth.cat.df.2[synth.cat.df.2$magnitudes >= 6 & synth.cat.df.2$magnitudes < 6.5, ]),
+  nrow(synth.cat.df.3[synth.cat.df.3$magnitudes >= 6 & synth.cat.df.3$magnitudes < 6.5, ]),
+  nrow(synth.cat.df.4[synth.cat.df.4$magnitudes >= 6 & synth.cat.df.4$magnitudes < 6.5, ]),
+  nrow(synth.cat.df.5[synth.cat.df.5$magnitudes >= 6 & synth.cat.df.5$magnitudes < 6.5, ])
+)
+
+num.events.6.5.7 <- c(
+  nrow(synth.cat.df.1[synth.cat.df.1$magnitudes >= 6.5 & synth.cat.df.1$magnitudes < 7, ]),
+  nrow(synth.cat.df.2[synth.cat.df.2$magnitudes >= 6.5 & synth.cat.df.2$magnitudes < 7, ]),
+  nrow(synth.cat.df.3[synth.cat.df.3$magnitudes >= 6.5 & synth.cat.df.3$magnitudes < 7, ]),
+  nrow(synth.cat.df.4[synth.cat.df.4$magnitudes >= 6.5 & synth.cat.df.4$magnitudes < 7, ]),
+  nrow(synth.cat.df.5[synth.cat.df.5$magnitudes >= 6.5 & synth.cat.df.5$magnitudes < 7, ])
+)
+
+num.events.gt.7 <- c(
+  nrow(synth.cat.df.1[synth.cat.df.1$magnitudes >= 7, ]),
+  nrow(synth.cat.df.2[synth.cat.df.2$magnitudes >= 7, ]),
+  nrow(synth.cat.df.3[synth.cat.df.3$magnitudes >= 7, ]),
+  nrow(synth.cat.df.4[synth.cat.df.4$magnitudes >= 7, ]),
+  nrow(synth.cat.df.5[synth.cat.df.5$magnitudes >= 7, ])
+)
+
+```
+
+```{r}
+# plot a grouped bar chart
+df <- data.frame(
+  catalogue = c(1, 2, 3, 4, 5),
+  num_events_5_5_5 = num.events.5.5.5,
+  num_events_5_5_6 = num.events.5.5.6,
+  num_events_6_6_5 = num.events.6.6.5,
+  num_events_6_5_7 = num.events.6.5.7,
+  num_events_gt_7 = num.events.gt.7
+)
+
+# Melt the data frame to long format
+df_long <- melt(df, id.vars = "catalogue", 
+                variable.name = "event_type", 
+                value.name = "count")
+
+# Create the grouped bar chart with flipped coordinates and reverse catalogue order
+ggplot(df_long, aes(x = factor(catalogue), y = count, fill = event_type)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(x = "Catalogue", y = "Number of Events", fill = "Event Type") +
+  theme_minimal() +
+  # rename the legend labels
+  scale_fill_discrete(name = "Event Type", labels = c("5 <= M < 5.5", "5.5 <= M < 6", "6 <= M < 6.5", "6.5 <= M < 7", "7 <= M"))
 ```
