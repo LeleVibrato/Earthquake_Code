@@ -7,15 +7,20 @@ editor: visual
 ```{r}
 # delete all objects in the environment
 rm(list = ls())
+```
+
+
+```{r}
 library(ETAS.inlabru)
-library(ggplot2)
+library(tidyverse)
 library(gridExtra)
 library(reshape2)
-library(tidyr)
+library(ggridges)
+library(ggdist)
 ```
 
 ```{r}
-num.cores <- 6
+num.cores <- 12
 future::plan(future::multisession, workers = num.cores)
 INLA::inla.setOption(num.threads = num.cores)
 ```
@@ -27,7 +32,6 @@ set.seed(123)
 # Set True ETAS Parameters
 
 ```{r}
-set.seed(111)
 # set true ETAS parameters
 true.param <- list(mu = 0.30106014, K = 0.13611399, alpha = 2.43945301, c = 0.07098607, p = 1.17838741)
 # set magnitude distribution parameter
@@ -37,19 +41,18 @@ M0 <- 2.5
 # set starting time of the synthetic catalogue
 T1 <- 0
 # set end time of the synthetic catalogue
-T2 <- 365
+T2 <- 1000
 ```
 
 ```{r}
 # a function to generate synthetic catalogues
 generate_synthetic_catalogue <- function(
-  theta,
-  beta.p,
-  M0,
-  T1,
-  T2,
-  Ht = NULL
-) {
+    theta,
+    beta.p,
+    M0,
+    T1,
+    T2,
+    Ht = NULL) {
   # generate the catalogue-1 - it returns a list of data.frames
   synth.cat.list <- generate_temporal_ETAS_synthetic(
     theta = theta,
@@ -69,8 +72,8 @@ generate_synthetic_catalogue <- function(
 ```{r}
 # create a dataframe containing the known events
 known.events.df.1 <- data.frame(
-  ts = c(T2*0.5),
-  magnitudes = c(5)
+  ts = c(T2 * 0.5),
+  magnitudes = c(4)
 )
 # gerate the synthetic catalogue-1
 synth.cat.df.1 <- generate_synthetic_catalogue(
@@ -83,8 +86,8 @@ synth.cat.df.1 <- generate_synthetic_catalogue(
 )
 # create a dataframe containing the known events
 known.events.df.2 <- data.frame(
-  ts = c(T2*0.5),
-  magnitudes = c(6.7)
+  ts = c(T2 * 0.5),
+  magnitudes = c(5)
 )
 # generate the catalogue-2
 synth.cat.df.2 <- generate_synthetic_catalogue(
@@ -97,8 +100,8 @@ synth.cat.df.2 <- generate_synthetic_catalogue(
 )
 # create a dataframe containing the known events
 known.events.df.3 <- data.frame(
-  ts = c(T2*0.5, T2*0.75),
-  magnitudes = c(5, 6.7)
+  ts = c(T2 * 0.5, T2 * 0.75),
+  magnitudes = c(4, 4)
 )
 # generate the catalogue-3
 synth.cat.df.3 <- generate_synthetic_catalogue(
@@ -111,8 +114,8 @@ synth.cat.df.3 <- generate_synthetic_catalogue(
 )
 # create a dataframe containing the known events
 known.events.df.4 <- data.frame(
-  ts = c(T2*0.5, T2*0.75),
-  magnitudes = c(6.7, 6.7)
+  ts = c(T2 * 0.5, T2 * 0.75),
+  magnitudes = c(4, 5)
 )
 # generate the catalogue-4
 synth.cat.df.4 <- generate_synthetic_catalogue(
@@ -125,8 +128,8 @@ synth.cat.df.4 <- generate_synthetic_catalogue(
 )
 # create a dataframe containing the known events
 known.events.df.5 <- data.frame(
-  ts = c(T2*0.25, T2*0.5, T2*0.75),
-  magnitudes = c(5, 6.7, 5)
+  ts = c(T2 * 0.5, T2 * 0.75),
+  magnitudes = c(5, 5)
 )
 # generate the catalogue-5
 synth.cat.df.5 <- generate_synthetic_catalogue(
@@ -174,10 +177,25 @@ grid.arrange(plt.1, plt.2, plt.3, plt.4, plt.5, ncol = 1)
 ```
 
 # Calculate the Number of Events
-
 ```{r}
-# calculate the number of events with magnitude (5<= M < 5.5) 
+# calculate the number of events with magnitude (4<= M < 4.5) (4.5 <= M < 5) (5<= M < 5.5)
 # (5.5<= M < 6) (6<= M < 6.5) (6.5<= M < 7) (7<= M)
+
+num.events.4.4.5 <- c(
+  nrow(synth.cat.df.1[synth.cat.df.1$magnitudes >= 4 & synth.cat.df.1$magnitudes < 4.5, ]),
+  nrow(synth.cat.df.2[synth.cat.df.2$magnitudes >= 4 & synth.cat.df.2$magnitudes < 4.5, ]),
+  nrow(synth.cat.df.3[synth.cat.df.3$magnitudes >= 4 & synth.cat.df.3$magnitudes < 4.5, ]),
+  nrow(synth.cat.df.4[synth.cat.df.4$magnitudes >= 4 & synth.cat.df.4$magnitudes < 4.5, ]),
+  nrow(synth.cat.df.5[synth.cat.df.5$magnitudes >= 4 & synth.cat.df.5$magnitudes < 4.5, ])
+)
+
+num.events.4.5.5 <- c(
+  nrow(synth.cat.df.1[synth.cat.df.1$magnitudes >= 4.5 & synth.cat.df.1$magnitudes < 5, ]),
+  nrow(synth.cat.df.2[synth.cat.df.2$magnitudes >= 4.5 & synth.cat.df.2$magnitudes < 5, ]),
+  nrow(synth.cat.df.3[synth.cat.df.3$magnitudes >= 4.5 & synth.cat.df.3$magnitudes < 5, ]),
+  nrow(synth.cat.df.4[synth.cat.df.4$magnitudes >= 4.5 & synth.cat.df.4$magnitudes < 5, ]),
+  nrow(synth.cat.df.5[synth.cat.df.5$magnitudes >= 4.5 & synth.cat.df.5$magnitudes < 5, ])
+)
 
 num.events.5.5.5 <- c(
   nrow(synth.cat.df.1[synth.cat.df.1$magnitudes >= 5 & synth.cat.df.1$magnitudes < 5.5, ]),
@@ -218,15 +236,15 @@ num.events.gt.7 <- c(
   nrow(synth.cat.df.4[synth.cat.df.4$magnitudes >= 7, ]),
   nrow(synth.cat.df.5[synth.cat.df.5$magnitudes >= 7, ])
 )
-
 ```
 
 # Plot the Number of Events
-
 ```{r}
 # plot a grouped bar chart
 df <- data.frame(
   catalogue = c(1, 2, 3, 4, 5),
+  num_events_4_4_5 = num.events.4.4.5,
+  num_events_4_5_5 = num.events.4.5.5,
   num_events_5_5_5 = num.events.5.5.5,
   num_events_5_5_6 = num.events.5.5.6,
   num_events_6_6_5 = num.events.6.6.5,
@@ -235,9 +253,11 @@ df <- data.frame(
 )
 
 # Melt the data frame to long format
-df_long <- melt(df, id.vars = "catalogue", 
-                variable.name = "event_type", 
-                value.name = "count")
+df_long <- melt(df,
+  id.vars = "catalogue",
+  variable.name = "event_type",
+  value.name = "count"
+)
 
 # Create the grouped bar chart with flipped coordinates and reverse catalogue order
 ggplot(df_long, aes(x = factor(catalogue), y = count, fill = event_type)) +
@@ -245,9 +265,32 @@ ggplot(df_long, aes(x = factor(catalogue), y = count, fill = event_type)) +
   labs(x = "Catalogue", y = "Number of Events", fill = "Event Type") +
   theme_minimal() +
   # rename the legend labels
-  scale_fill_brewer(name = "Event Type", labels = c("5 <= M < 5.5", "5.5 <= M < 6", "6 <= M < 6.5", "6.5 <= M < 7", "7 <= M"),palette = "PuBu")
-
+  scale_fill_brewer(name = "Event Type", labels = c("4 <= M < 4.5", "4.5 <= M < 5", "5 <= M < 5.5", "5.5 <= M < 6", "6 <= M < 6.5", "6.5 <= M < 7", "7 <= M"))
 ```
+
+```{r}
+# Plot grouped density chart
+
+catelogues <- c(rep(1, nrow(synth.cat.df.1)), rep(2, nrow(synth.cat.df.2)), rep(3, nrow(synth.cat.df.3)), rep(4, nrow(synth.cat.df.4)), rep(5, nrow(synth.cat.df.5)))
+
+# create a data.frame of the magnitudes
+df.magnitudes <- data.frame(
+  catalogue = catelogues,
+  magnitudes = c(
+    synth.cat.df.1$magnitudes,
+    synth.cat.df.2$magnitudes,
+    synth.cat.df.3$magnitudes,
+    synth.cat.df.4$magnitudes,
+    synth.cat.df.5$magnitudes
+  )
+)
+ggplot(df.magnitudes, aes(x = factor(catalogue), y = magnitudes)) +
+  geom_violin(fill = "grey", alpha = 0.5) +
+  geom_point(position = position_jitter(width = 0.2), size = 1.5) +
+  labs(x = "Catalogue", y = "Magnitudes") +
+  theme_minimal() 
+```
+
 
 # Prepare the Data for Model Fitting
 ```{r}
@@ -333,8 +376,14 @@ fit.list <- lapply(synth.cat.list, function(synth.cat.df) {
 ```
 
 ```{r}
+# create data.frame of true value of parameters
+df.true.param <- data.frame(
+  x = unlist(true.param),
+  param = names(true.param)
+)
+
 input_list <- list(
-  model.fit = fit.list[[1]],
+  model.fit = fit.list[[5]],
   link.functions = link.f
 )
 
@@ -342,5 +391,110 @@ input_list <- list(
 post.list <- get_posterior_param(input.list = input_list)
 
 # plot marginal posteriors
-post.list$post.plot
+post.list$post.plot +
+   geom_vline(
+    data = df.true.param,
+    mapping = aes(xintercept = x), linetype = 2
+  )
 ```
+
+```{r}
+
+# create a list of model fitting results
+input_list_1 <- list(
+  model.fit = fit.list[[1]],
+  link.functions = link.f
+)
+input_list_2 <- list(
+  model.fit = fit.list[[2]],
+  link.functions = link.f
+)
+input_list_3 <- list(
+  model.fit = fit.list[[3]],
+  link.functions = link.f
+)
+input_list_4 <- list(
+  model.fit = fit.list[[4]],
+  link.functions = link.f
+)
+input_list_5 <- list(
+  model.fit = fit.list[[5]],
+  link.functions = link.f
+)
+# retrieve marginal posterior distributions
+post.list.1 <- get_posterior_param(input.list = input_list_1)
+post.list.2 <- get_posterior_param(input.list = input_list_2)
+post.list.3 <- get_posterior_param(input.list = input_list_3)
+post.list.4 <- get_posterior_param(input.list = input_list_4)
+post.list.5 <- get_posterior_param(input.list = input_list_5)
+# set model identifier
+post.list.1$post.df$cat.used <- "1"
+post.list.2$post.df$cat.used <- "2"
+post.list.3$post.df$cat.used <- "3"
+post.list.4$post.df$cat.used <- "4"
+post.list.5$post.df$cat.used <- "5"
+# bind marginal posterior data.frames
+bind.post.df <- rbind(
+  post.list.1$post.df,
+  post.list.2$post.df,
+  post.list.3$post.df,
+  post.list.4$post.df,
+  post.list.5$post.df
+)
+```
+
+
+```{r}
+# plot them
+ggplot(bind.post.df, aes(x = x, y = y, color = cat.used)) +
+  geom_line() +
+  facet_wrap(facets = ~param, scales = "free") +
+  xlab("param") +
+  ylab("pdf") +
+  geom_vline(
+    data = df.true.param,
+    mapping = aes(xintercept = x), linetype = 2
+  )
+```
+
+
+# Plot the Marginal Posteriors (alpha)
+```{r}
+# plot the marginal posteriors of alpha
+ggplot(bind.post.df[bind.post.df$param == "alpha", ], aes(x = x, y = y, color = cat.used)) +
+  geom_line() +
+  xlab("alpha") +
+  ylab("pdf") +
+  geom_vline(
+    data = df.true.param[df.true.param$param == "alpha", ],
+    mapping = aes(xintercept = x), linetype = 2
+  )
+```
+
+```{r}
+ggplot(bind.post.df[bind.post.df$param == "alpha", ], aes(x = x, y = cat.used)) +
+  stat_slab(aes(fill = after_stat(level)), .width = c(.66, .95, .99, 1)) +
+  stat_pointinterval() +
+  scale_fill_brewer(na.translate = FALSE) +
+  geom_vline(
+    data = df.true.param[df.true.param$param == "alpha", ],
+    aes(xintercept = x), linetype = 2, color = "red", size = 1
+  ) +
+  theme_minimal()
+ 
+```
+
+
+```{r}
+ggplot(bind.post.df, aes(x = x, y = cat.used)) +
+  stat_slab(aes(fill = after_stat(level)), .width = c(.66, .95, .99, 1)) +
+  stat_pointinterval() +
+  scale_fill_brewer(na.translate = FALSE) +
+  geom_vline(
+    data = df.true.param[df.true.param$param == "alpha", ],
+    aes(xintercept = x), linetype = 2, color = "red", size = 1
+  ) +
+  theme_minimal() +
+  facet_wrap(facets = ~param, scales = "free", ncol = 3)
+```
+
