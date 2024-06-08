@@ -25,6 +25,10 @@ INLA::inla.setOption(num.threads = num.cores)
 ```{r}
 # set true ETAS parameters
 true.param <- list(mu = 0.30106014, K = 0.13611399, alpha = 2.43945301, c = 0.07098607, p = 1.17838741)
+df.true.param <- data.frame(
+  x = unlist(true.param),
+  param = names(true.param)
+)
 # set magnitude distribution parameter
 beta.p <- 2.353157
 # set cutoff magnitude
@@ -32,7 +36,7 @@ M0 <- 2.5
 # set starting time of the synthetic catalogue
 T1 <- 0
 # set end time of the synthetic catalogue
-T2 <- 365
+T2 <- 1000
 ```
 
 ## Define a function to generate synthetic catalogues
@@ -77,6 +81,12 @@ synth.cat.list <- lapply(1:10, function(i) {
     T2 = T2,
     idx = i
   )
+})
+# Sort each catalogue by occurrence time and add event identifier
+synth.cat.list <- lapply(synth.cat.list, function(df) {
+  df <- df[order(df$ts), ]
+  df$idx.p <- seq_len(nrow(df))
+  return(df)
 })
 ```
 
@@ -140,7 +150,6 @@ synth.cat.df$dgen <- case_when(
 # 4     1 144.         2.86     1   133   108      25
 # 5     1 325.         2.73     1   133   108      25
 # 6     1   9.32       2.52     1   133   108      25
-
 ```
 
 ## Plot the synthetic catalogues
@@ -152,14 +161,20 @@ synth.cat.df %>%
   ggplot(aes(x = ts, y = magnitudes)) +
   geom_point(aes(color = factor(dgen))) +
   facet_wrap(~idx, scales = "fixed", ncol = 2, labeller = as_labeller(function(x) {
-    paste0("Seeded catalogue ", x, ", N = ", unique(synth.cat.df$N[synth.cat.df$idx == x]), ", N.bkg = ", unique(synth.cat.df$N.bkg[synth.cat.df$idx == x]), ", N.after = ", unique(synth.cat.df$N.after[synth.cat.df$idx == x]))
-  })) + 
-  theme_minimal() + 
-  labs(x = "Time [days]", y = "Magnitude", title = "Synthetic Catalogues with Event Counts") +
-  # rename the legend
-  scale_color_discrete(name = "Event Type") +
-  theme(legend.position = "bottom")
-
+    paste0(
+      "Catalogue ", x, ", N = ", unique(synth.cat.df$N[synth.cat.df$idx == x]),
+      ", N.bkg = ", unique(synth.cat.df$N.bkg[synth.cat.df$idx == x]), ", N.after = ",
+      unique(synth.cat.df$N.after[synth.cat.df$idx == x])
+    )
+  })) +
+  theme_bw() +
+  theme(
+   # text = element_text(size = 14),
+    legend.position = "bottom",
+    strip.background = element_rect(fill = "white", color = "black"),
+  ) +
+  labs(x = "Time [days]", y = "Magnitude") +
+  scale_color_discrete(name = "Event Type") 
 ```
 
 ## Fit the ETAS model to the synthetic catalogues
@@ -193,12 +208,11 @@ th.init <- list(
 
 # set up list of bru options
 bru.opt.list <- list(
-  bru_verbose = 3, # type of visual output
+  bru_verbose = 0, # type of visual output
   bru_max_iter = 70, # maximum number of iterations
   # bru_method = list(max_step = 0.5),
   bru_initial = th.init
 ) # parameters initial values
-
 ```
 
 ```{r}
@@ -216,9 +230,55 @@ fit.list <- lapply(synth.cat.list, function(synth.cat.df) {
     N.max. = 5,
     bru.opt = bru.opt.list
   )
+  print("finish...")
   return(fit)
 })
-
 ```
 
-## 
+## Plot the ETAS model results
+
+```{r}
+# create a list of model fitting results
+input_lists <- lapply(1:length(fit.list), function(i) {
+  list(
+    model.fit = fit.list[[i]],
+    link.functions = link.f
+  )
+})
+
+# retrieve marginal posterior distributions and set model identifier
+post_lists <- lapply(1:length(fit.list), function(i) {
+  post.list <- get_posterior_param(input.list = input_lists[[i]])
+  post.list$post.df$cat.used <- as.character(i)
+  return(post.list)
+})
+
+# bind marginal posterior data.frames
+bind.post.df <- do.call(rbind, lapply(post_lists, function(x) x$post.df))
+```
+
+```{r}
+# Plot the marginal posterior distributions of the ETAS parameters
+plot.mp <- ggplot(bind.post.df, aes(x = x, y = y, color = cat.used, linetype = cat.used)) +
+  geom_line(size = 1) +
+  facet_wrap(~param, scales = "free", ncol = 3) +
+  xlab("Parameter Value") +
+  ylab("Density") +
+  geom_vline(
+    data = df.true.param,
+    aes(xintercept = x), linetype = 2, color = "black", size = 1
+  ) +
+  theme_bw() +
+  theme(
+   # text = element_text(size = 14),
+    legend.position = "bottom",
+    strip.background = element_rect(fill = "white", color = "black"),
+  ) +
+  labs(
+    color = "Category Used",
+    linetype = "Category Used"
+  )
+
+plot.mp
+ggsave("marginal_posterior_distributions.pdf", plot.mp, width = 15, height = 10, dpi = 300)
+```

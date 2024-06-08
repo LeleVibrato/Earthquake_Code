@@ -9,7 +9,6 @@ editor: visual
 rm(list = ls())
 ```
 
-
 ```{r}
 library(ETAS.inlabru)
 library(tidyverse)
@@ -35,7 +34,10 @@ set.seed(123)
 
 ```{r}
 # set true ETAS parameters
-true.param <- list(mu = 0.30106014, K = 0.13611399, alpha = 2.43945301, c = 0.07098607, p = 1.17838741)
+true.param <- list(
+  mu = 0.30106014, K = 0.13611399, alpha = 2.43945301,
+  c = 0.07098607, p = 1.17838741
+)
 # set magnitude distribution parameter
 beta.p <- 2.353157
 # set cutoff magnitude
@@ -165,7 +167,10 @@ plot_synthetic_catalogue <- function(synth.cat.df, title) {
   plt <- ggplot(synth.cat.df, aes(x = ts, y = magnitudes)) +
     geom_point() +
     # mark the events with magnitude greater than 5
-    geom_point(data = synth.cat.df[synth.cat.df$magnitudes >= 5, ], aes(x = ts, y = magnitudes), color = "red") +
+    geom_point(
+      data = synth.cat.df[synth.cat.df$magnitudes >= 5, ],
+      aes(x = ts, y = magnitudes), color = "red"
+    ) +
     theme_minimal() +
     xlab("Time [days]") +
     ylab("Magnitude") +
@@ -185,9 +190,8 @@ grid.arrange(grobs = plots, ncol = 1)
 ```
 
 ## Prepare the Data for Model Fitting
+
 ```{r}
-
-
 # Sort each catalogue by occurrence time and add event identifier
 synth.cat.list <- lapply(synth.cat.list, function(df) {
   df <- df[order(df$ts), ]
@@ -254,12 +258,15 @@ fit.list <- lapply(synth.cat.list, function(synth.cat.df) {
   return(fit)
 })
 ```
+
 ```{r}
 # create a list of model fitting results
-input_lists <- lapply(1:length(synth.cat.list), function(i) list(
-  model.fit = fit.list[[i]],
-  link.functions = link.f
-))
+input_lists <- lapply(1:length(synth.cat.list), function(i) {
+  list(
+    model.fit = fit.list[[i]],
+    link.functions = link.f
+  )
+})
 
 # retrieve marginal posterior distributions and set model identifier
 post_lists <- lapply(1:length(synth.cat.list), function(i) {
@@ -272,10 +279,12 @@ post_lists <- lapply(1:length(synth.cat.list), function(i) {
 bind.post.df <- do.call(rbind, lapply(post_lists, function(x) x$post.df))
 ```
 
-
 ```{r}
 # plot them
-ggplot(bind.post.df, aes(x = x, y = y, color = cat.used)) +
+ggplot(bind.post.df, aes(
+  x = x, y = y,
+  color = cat.used, linetype = cat.used
+)) +
   geom_line() +
   facet_wrap(facets = ~param, scales = "free") +
   xlab("param") +
@@ -286,11 +295,14 @@ ggplot(bind.post.df, aes(x = x, y = y, color = cat.used)) +
   )
 ```
 
-
 ## Plot the Marginal Posteriors (alpha)
+
 ```{r}
 # plot the marginal posteriors of alpha
-ggplot(bind.post.df[bind.post.df$param == "alpha", ], aes(x = x, y = y, color = cat.used)) +
+ggplot(
+  bind.post.df[bind.post.df$param == "alpha", ],
+  aes(x = x, y = y, color = cat.used, linetype = cat.used)
+) +
   geom_line() +
   xlab("alpha") +
   ylab("pdf") +
@@ -301,32 +313,97 @@ ggplot(bind.post.df[bind.post.df$param == "alpha", ], aes(x = x, y = y, color = 
 ```
 
 ```{r}
+# Plot the marginal posteriors of alpha
+ggplot(
+  bind.post.df[bind.post.df$param == "alpha", ],
+  aes(x = x, y = y, color = cat.used, linetype = cat.used)
+) +
+  geom_line(size = 1) +
+  xlab(expression(alpha)) +
+  ylab("Density") +
+  geom_vline(
+    data = df.true.param[df.true.param$param == "alpha", ],
+    mapping = aes(xintercept = x), linetype = 2, color = "black", size = 0.8
+  ) +
+  scale_color_discrete(name = "Category") +
+  scale_linetype_discrete(name = "Category") +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14, family = "serif"),
+    legend.title = element_text(size = 12, face = "bold"),
+    legend.text = element_text(size = 10),
+    legend.position = "bottom",
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
+    axis.title = element_text(size = 14),
+    axis.text = element_text(size = 12),
+    panel.grid.major = element_line(color = "grey80"),
+    panel.grid.minor = element_line(color = "grey90")
+  ) +
+  ggtitle("Marginal Posterior Distributions of Alpha")
+```
+
+```{r}
+# Plot the marginal posteriors of alpha with additional visual enhancements
 ggplot(bind.post.df[bind.post.df$param == "alpha", ], aes(x = x, y = cat.used)) +
   stat_slab(aes(fill = after_stat(level)), .width = c(.66, .95, .99, 1)) +
   stat_pointinterval() +
-  scale_fill_brewer(na.translate = FALSE) +
-  geom_vline(
-    data = df.true.param[df.true.param$param == "alpha", ],
-    aes(xintercept = x), linetype = 2, color = "red", size = 1
-  ) +
-  theme_minimal()
- 
-```
-
-
-```{r}
-ggplot(bind.post.df, aes(x = x, y = cat.used)) +
-  stat_slab(aes(fill = after_stat(level)), .width = c(.66, .95, .99, 1)) +
-  stat_pointinterval() +
-  scale_fill_brewer(na.translate = FALSE) +
+  scale_fill_brewer(palette = "Blues", na.translate = FALSE, name = "Credible Level") +
   geom_vline(
     data = df.true.param[df.true.param$param == "alpha", ],
     aes(xintercept = x), linetype = 2, color = "red", size = 1
   ) +
   theme_minimal() +
-  facet_wrap(facets = ~param, scales = "free", ncol = 3)
+  theme(
+    text = element_text(size = 14, family = "serif"),
+    legend.title = element_text(size = 12, face = "bold"),
+    legend.text = element_text(size = 10),
+    legend.position = "bottom",
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
+    axis.title = element_text(size = 14),
+    axis.text = element_text(size = 12),
+    panel.grid.major = element_line(color = "grey80"),
+    panel.grid.minor = element_line(color = "grey90")
+  ) +
+  labs(
+    x = expression(alpha),
+    y = "Category Used",
+    title = "Marginal Posterior Distributions of Alpha",
+    fill = "Credible Interval"
+  )
 ```
 
+```{r}
+library(ggplot2)
+library(ggdist)
 
+# Plot the marginal posteriors for all parameters with facets
+ggplot(bind.post.df, aes(x = x, y = cat.used)) +
+  stat_slab(aes(fill = after_stat(level)), .width = c(.66, .95, .99, 1)) +
+  stat_pointinterval() +
+  scale_fill_brewer(palette = "Blues", na.translate = FALSE, name = "Credible Level") +
+  geom_vline(
+    data = df.true.param,
+    aes(xintercept = x), linetype = 2, color = "red", size = 1
+  ) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14, family = "serif"),
+    legend.title = element_text(size = 12, face = "bold"),
+    legend.text = element_text(size = 10),
+    legend.position = "top",
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
+    axis.title = element_text(size = 14),
+    axis.text = element_text(size = 12),
+    panel.grid.major = element_line(color = "grey80"),
+    panel.grid.minor = element_line(color = "grey90"),
+    strip.text = element_text(size = 12, face = "bold")
+  ) +
+  labs(
+    x = expression(alpha),
+    y = "Category Used",
+    title = "Marginal Posterior Distributions",
+    fill = "Credible Interval"
+  ) +
+  facet_wrap(~param, scales = "free", ncol = 3)
 
-
+```
