@@ -1,0 +1,154 @@
+---
+title: "large amount"
+output: html_document
+date: "2024-06-08"
+---
+
+```{r}
+rm(list = ls())
+```
+
+
+```{r}
+library(ETAS.inlabru)
+library(tidyverse)
+set.seed(123)
+```
+
+```{r}
+num.cores <- 12
+future::plan(future::multisession, workers = num.cores)
+INLA::inla.setOption(num.threads = num.cores)
+```
+
+## Set the true ETAS parameters
+```{r}
+# set true ETAS parameters
+true.param <- list(mu = 0.30106014, K = 0.13611399, alpha = 2.43945301, c = 0.07098607, p = 1.17838741)
+# set magnitude distribution parameter
+beta.p <- 2.353157
+# set cutoff magnitude
+M0 <- 2.5
+# set starting time of the synthetic catalogue
+T1 <- 0
+# set end time of the synthetic catalogue
+T2 <- 365
+```
+
+## Define a function to generate synthetic catalogues
+
+```{r}
+# a function to generate synthetic catalogues
+generate_synthetic_catalogue <- function(
+    theta,
+    beta.p,
+    M0,
+    T1,
+    T2,
+    Ht = NULL,
+    idx = NULL) {
+  # generate the catalogue-1 - it returns a list of data.frames
+  synth.cat.list <- generate_temporal_ETAS_synthetic(
+    theta = theta,
+    beta.p = beta.p,
+    M0 = M0,
+    T1 = T1,
+    T2 = T2,
+    Ht = Ht
+  )
+  synth.cat.df <- do.call(rbind, synth.cat.list)
+  synth.cat.df$idx <- str(idx)
+  return(synth.cat.df)
+}
+```
+
+
+## Generate synthetic catalogues
+
+```{r}
+# create 10 synthetic catalogue with the same parameters
+# use a loop to generate 5 synthetic catalogues and store them in a list
+synth.cat.list <- lapply(1:10, function(i) {
+  generate_synthetic_catalogue(
+    theta = true.param,
+    beta.p = beta.p,
+    M0 = M0,
+    T1 = T1,
+    T2 = T2,
+    idx = i
+  )
+})
+```
+
+
+```{r}
+names(synth.cat.list[[1]])
+# > names(synth.cat.list[[1]])
+# [1] "ts"         "magnitudes" "gen"
+```
+
+
+```{r}
+# convert the list of data.frames to a single tibble
+# add an index column to the data.frame
+synth.cat.df <- bind_rows(synth.cat.list, .id = "idx")
+synth.cat.df <- synth.cat.df %>% tibble()
+# convert the index column to integer
+synth.cat.df$idx <- as.integer(synth.cat.df$idx)
+
+# compare the number of events in the synthetic catalogues
+# sort the synthetic catalogues by the index
+count_df <- synth.cat.df %>%
+  group_by(idx) %>%
+  summarise(
+    N = n(),
+    N.bkg = sum(gen == 1),
+    N.after = sum(gen > 1)
+  ) %>%
+  arrange(idx)
+# > count_df
+# # A tibble: 10 × 4
+#      idx     N N.bkg N.after
+#    <int> <int> <int>   <int>
+#  1     1   133   108      25
+#  2     2   238    93     145
+#  3     3   178   110      68
+#  4     4   806   115     691
+#  5     5   115   101      14
+#  6     6   149   106      43
+#  7     7   145   112      33
+#  8     8   194   112      82
+#  9     9   148   104      44
+# 10    10   143   113      30
+
+# add the count data to the synthetic catalogue data
+synth.cat.df <- left_join(synth.cat.df, count_df, by = "idx")
+
+# > head(synth.cat.df)
+# # A tibble: 6 × 7
+#     idx     ts magnitudes   gen     N N.bkg N.after
+#   <int>  <dbl>      <dbl> <dbl> <int> <int>   <int>
+# 1     1 356.         2.63     1   133   108      25
+# 2     1 249.         2.52     1   133   108      25
+# 3     1 306.         3.05     1   133   108      25
+# 4     1 144.         2.86     1   133   108      25
+# 5     1 325.         2.73     1   133   108      25
+# 6     1   9.32       2.52     1   133   108      25
+
+```
+
+## Plot the synthetic catalogues
+
+```{r}
+library(ggplot2)
+library(dplyr)
+synth.cat.df %>%
+  ggplot(aes(x = ts, y = magnitudes)) +
+  geom_point(aes(color = factor(gen))) +
+  facet_wrap(~idx, scales = "fixed", ncol = 2, labeller = as_labeller(function(x) {
+    paste0("Seeded catalogue ", x, ", N = ", unique(synth.cat.df$N[synth.cat.df$idx == x]), ", N.bkg = ", unique(synth.cat.df$N.bkg[synth.cat.df$idx == x]), ", N.after = ", unique(synth.cat.df$N.after[synth.cat.df$idx == x]))
+  })) + 
+  theme_minimal() + 
+  labs(x = "Time [days]", y = "Magnitude", title = "Synthetic Catalogues with Event Counts")
+
+```

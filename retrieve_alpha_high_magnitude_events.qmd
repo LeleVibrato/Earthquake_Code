@@ -29,7 +29,9 @@ INLA::inla.setOption(num.threads = num.cores)
 set.seed(123)
 ```
 
-# Set True ETAS Parameters
+# Alpha
+
+## Set True ETAS Parameters
 
 ```{r}
 # set true ETAS parameters
@@ -67,7 +69,7 @@ generate_synthetic_catalogue <- function(
 }
 ```
 
-# Generate Synthetic Catalogues
+## Generate Synthetic Catalogues
 
 ```{r}
 # create a dataframe containing the known events
@@ -148,7 +150,7 @@ colnames(synth.cat.df.1)
 # [1] "ts" "magnitudes" "gen"
 ```
 
-# Plot Synthetic Catalogues
+## Plot Synthetic Catalogues
 
 ```{r}
 # create a function to plot the synthetic catalogues
@@ -176,7 +178,7 @@ plt.5 <- plot_synthetic_catalogue(synth.cat.df.5, "Synthetic Catalogue 5")
 grid.arrange(plt.1, plt.2, plt.3, plt.4, plt.5, ncol = 1)
 ```
 
-# Calculate the Number of Events
+## Calculate the Number of Events
 ```{r}
 # calculate the number of events with magnitude (4<= M < 4.5) (4.5 <= M < 5) (5<= M < 5.5)
 # (5.5<= M < 6) (6<= M < 6.5) (6.5<= M < 7) (7<= M)
@@ -238,7 +240,7 @@ num.events.gt.7 <- c(
 )
 ```
 
-# Plot the Number of Events
+## Plot the Number of Events
 ```{r}
 # plot a grouped bar chart
 df <- data.frame(
@@ -292,7 +294,7 @@ ggplot(df.magnitudes, aes(x = factor(catalogue), y = magnitudes)) +
 ```
 
 
-# Prepare the Data for Model Fitting
+## Prepare the Data for Model Fitting
 ```{r}
 # sort catalogue by occurrence time
 synth.cat.df.1 <- synth.cat.df.1[order(synth.cat.df.1$ts), ]
@@ -317,7 +319,7 @@ synth.cat.list <- list(
 )
 ```
 
-# Model Fitting
+## Model Fitting
 
 ```{r}
 # set copula transformations list
@@ -458,7 +460,7 @@ ggplot(bind.post.df, aes(x = x, y = y, color = cat.used)) +
 ```
 
 
-# Plot the Marginal Posteriors (alpha)
+## Plot the Marginal Posteriors (alpha)
 ```{r}
 # plot the marginal posteriors of alpha
 ggplot(bind.post.df[bind.post.df$param == "alpha", ], aes(x = x, y = y, color = cat.used)) +
@@ -497,4 +499,7 @@ ggplot(bind.post.df, aes(x = x, y = cat.used)) +
   theme_minimal() +
   facet_wrap(facets = ~param, scales = "free", ncol = 3)
 ```
+
+
+
 
