@@ -57,7 +57,7 @@ generate_synthetic_catalogue <- function(
     Ht = Ht
   )
   synth.cat.df <- do.call(rbind, synth.cat.list)
-  synth.cat.df$idx <- str(idx)
+  synth.cat.df$idx <- as.integer(idx)
   return(synth.cat.df)
 }
 ```
@@ -93,8 +93,6 @@ names(synth.cat.list[[1]])
 # add an index column to the data.frame
 synth.cat.df <- bind_rows(synth.cat.list, .id = "idx")
 synth.cat.df <- synth.cat.df %>% tibble()
-# convert the index column to integer
-synth.cat.df$idx <- as.integer(synth.cat.df$idx)
 
 # compare the number of events in the synthetic catalogues
 # sort the synthetic catalogues by the index
@@ -124,6 +122,14 @@ count_df <- synth.cat.df %>%
 # add the count data to the synthetic catalogue data
 synth.cat.df <- left_join(synth.cat.df, count_df, by = "idx")
 
+# add a column to the synthetic catalogue data to indicate the generation of the event
+# gen = 1 for background events and gen > 1 for triggered events and other events
+synth.cat.df$dgen <- case_when(
+  synth.cat.df$gen == 1 ~ "Background",
+  synth.cat.df$gen > 1 ~ "Triggered",
+  .default = "Other"
+)
+
 # > head(synth.cat.df)
 # # A tibble: 6 × 7
 #     idx     ts magnitudes   gen     N N.bkg N.after
@@ -144,11 +150,75 @@ library(ggplot2)
 library(dplyr)
 synth.cat.df %>%
   ggplot(aes(x = ts, y = magnitudes)) +
-  geom_point(aes(color = factor(gen))) +
+  geom_point(aes(color = factor(dgen))) +
   facet_wrap(~idx, scales = "fixed", ncol = 2, labeller = as_labeller(function(x) {
     paste0("Seeded catalogue ", x, ", N = ", unique(synth.cat.df$N[synth.cat.df$idx == x]), ", N.bkg = ", unique(synth.cat.df$N.bkg[synth.cat.df$idx == x]), ", N.after = ", unique(synth.cat.df$N.after[synth.cat.df$idx == x]))
   })) + 
   theme_minimal() + 
-  labs(x = "Time [days]", y = "Magnitude", title = "Synthetic Catalogues with Event Counts")
+  labs(x = "Time [days]", y = "Magnitude", title = "Synthetic Catalogues with Event Counts") +
+  # rename the legend
+  scale_color_discrete(name = "Event Type") +
+  theme(legend.position = "bottom")
 
 ```
+
+## Fit the ETAS model to the synthetic catalogues
+```{r}
+# set copula transformations list
+link.f <- list(
+  mu = \(x) gamma_t(x, 0.3, 0.6),
+  K = \(x) unif_t(x, 0, 10),
+  alpha = \(x) unif_t(x, 0, 10),
+  c_ = \(x) unif_t(x, 0, 10),
+  p = \(x) unif_t(x, 1, 10)
+)
+
+# set inverse copula transformations list
+inv.link.f <- list(
+  mu = \(x) inv_gamma_t(x, 0.3, 0.6),
+  K = \(x) inv_unif_t(x, 0, 10),
+  alpha = \(x) inv_unif_t(x, 0, 10),
+  c_ = \(x) inv_unif_t(x, 0, 10),
+  p = \(x) inv_unif_t(x, 1, 10)
+)
+
+# set up list of initial values
+th.init <- list(
+  th.mu = inv.link.f$mu(0.5),
+  th.K = inv.link.f$K(0.1),
+  th.alpha = inv.link.f$alpha(1),
+  th.c = inv.link.f$c_(0.1),
+  th.p = inv.link.f$p(1.1)
+)
+
+# set up list of bru options
+bru.opt.list <- list(
+  bru_verbose = 3, # type of visual output
+  bru_max_iter = 70, # maximum number of iterations
+  # bru_method = list(max_step = 0.5),
+  bru_initial = th.init
+) # parameters initial values
+
+```
+
+```{r}
+# create a list of model fitting results
+fit.list <- lapply(synth.cat.list, function(synth.cat.df) {
+  # fit the model
+  fit <- Temporal.ETAS(
+    total.data = synth.cat.df,
+    M0 = M0,
+    T1 = T1,
+    T2 = T2,
+    link.functions = link.f,
+    coef.t. = 1,
+    delta.t. = 0.1,
+    N.max. = 5,
+    bru.opt = bru.opt.list
+  )
+  return(fit)
+})
+
+```
+
+## 
