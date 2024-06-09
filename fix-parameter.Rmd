@@ -399,7 +399,8 @@ fit.mis.alpha <- get_fit_and_plot(
   link.f = link.f,
   inv.link.f = inv.link.f,
   th.init = th.init,
-  title = "Mis-specify alpha"
+  title = "Mis-specify alpha",
+  fix = "alpha"
 )
 
 ```
@@ -429,18 +430,19 @@ inv.link.f <- list(
 
 # set up list of initial values
 th.init <- list(
-  th.mu = inv_link.f$mu(0.5),
-  th.K = inv_link.f$K(0.3),
-  th.alpha = inv_link.f$alpha(1),
-  th.c = inv_link.f$c_(0.1),
-  th.p = inv_link.f$p(1.1)
+  th.mu = inv.link.f$mu(0.5),
+  th.K = inv.link.f$K(0.3),
+  th.alpha = inv.link.f$alpha(1),
+  th.c = inv.link.f$c_(0.1),
+  th.p = inv.link.f$p(1.1)
 )
 
 fit.mis.K <- get_fit_and_plot(
   link.f = link.f,
   inv.link.f = inv.link.f,
   th.init = th.init,
-  title = "Mis-specify K"
+  title = "Mis-specify K",
+  fix = "K"
 )
 ```
 
