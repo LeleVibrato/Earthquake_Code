@@ -1,0 +1,449 @@
+---
+title: "fix the parameter"
+output: html_document
+date: "2024-06-09"
+---
+
+```{r}
+rm(list = ls())
+```
+
+
+```{r}
+library(ETAS.inlabru)
+library(tidyverse)
+set.seed(123)
+```
+
+```{r}
+num.cores <- 12
+future::plan(future::multisession, workers = num.cores)
+INLA::inla.setOption(num.threads = num.cores)
+```
+
+## simulate data
+```{r}
+# set true ETAS parameters
+true.param <- list(mu = 0.30106014, K = 0.13611399, alpha = 2.43945301, c = 0.07098607, p = 1.17838741)
+df.true.param <- data.frame(
+  x = unlist(true.param),
+  param = names(true.param)
+)
+# set magnitude distribution parameter
+beta.p <- 2.353157
+# set cutoff magnitude
+M0 <- 2.5
+# set starting time of the synthetic catalogue
+T1 <- 0
+# set end time of the synthetic catalogue
+T2 <- 1000
+```
+
+
+```{r}
+synth.cat.list <- generate_temporal_ETAS_synthetic(
+  theta = true.param,
+  beta.p = beta.p,
+  M0 = M0,
+  T1 = T1,
+  T2 = T2
+)
+# combine the synthetic catalogues
+synth.cat.df <- do.call(rbind, synth.cat.list)
+# order the synthetic catalogue by time
+synth.cat.df <- synth.cat.df[order(synth.cat.df$ts), ]
+# create a column with the index of the event
+synth.cat.df$idx.p <- seq_len(nrow(synth.cat.df))
+# create a column with the generation of the event
+synth.cat.df$dgen <- case_when(
+  synth.cat.df$gen == 1 ~ "Background",
+  synth.cat.df$gen > 1 ~ "Triggered",
+  .default = "Other"
+)
+```
+
+```{r}
+names(synth.cat.df)
+# > names(synth.cat.df)
+# [1] "ts"         "magnitudes" "gen"
+# reordering colu 
+```
+
+## Create a function to fix the parameters and return the posterior
+```{r}
+get_fit_and_plot <- function(link.f, inv.link.f, th.init, title, fix=NULL) {
+    # set up list of bru options
+    bru.opt.list <- list(
+        bru_verbose = 0, # type of visual output
+        bru_max_iter = 70, # maximum number of iterations
+        # bru_method = list(max_step = 0.5),
+        bru_initial = th.init
+    ) # parameters initial values
+    
+    fit <- Temporal.ETAS(
+        total.data = synth.cat.df,
+        M0 = M0,
+        T1 = T1,
+        T2 = T2,
+        link.functions = link.f,
+        coef.t. = 1,
+        delta.t. = 0.1,
+        N.max. = 5,
+        bru.opt = bru.opt.list
+    )
+    
+    input.list <- list(model.fit = fit, link.functions = link.f)
+    post <- get_posterior_param(input.list = input.list)
+    
+    df.true.param.filtered <- df.true.param
+    if (!is.null(fix)) {
+        post$post.df <- post$post.df %>% filter(param != fix)
+        df.true.param.filtered <- df.true.param %>% filter(param != fix)
+    }
+
+    plot <- ggplot(post$post.df, aes(x = x, y = y)) +
+        geom_line(size = 1) +
+        facet_wrap(~param, scales = "free", ncol = 3) +
+        xlab("Parameter Value") +
+        ylab("Density") +
+        geom_vline(
+        data = df.true.param.filtered,
+        aes(xintercept = x), linetype = 2, color = "black", size = 1
+        ) +
+        theme_bw() +
+        theme(
+        # text = element_text(size = 14),
+        legend.position = "bottom",
+        strip.background = element_rect(fill = "white", color = "black"),
+        ) + ggtitle(title)
+
+    return(list(fit = fit, post = post, plot = plot))
+}
+```
+
+## Without Fix the parameters and return the posterior
+```{r}
+
+link.f <- list(
+  mu = \(x) gamma_t(x, 0.3, 0.6),
+  K = \(x) unif_t(x, 0, 10),
+  alpha = \(x) unif_t(x, 0, 10),
+  c_ = \(x) unif_t(x, 0, 10),
+  p = \(x) unif_t(x, 1, 10)
+)
+
+# set inverse copula transformations list
+inv.link.f <- list(
+  mu = \(x) inv_gamma_t(x, 0.3, 0.6),
+  K = \(x) inv_unif_t(x, 0, 10),
+  alpha = \(x) inv_unif_t(x, 0, 10),
+  c_ = \(x) inv_unif_t(x, 0, 10),
+  p = \(x) inv_unif_t(x, 1, 10)
+)
+
+# set up list of initial values
+th.init <- list(
+  th.mu = inv.link.f$mu(0.5),
+  th.K = inv.link.f$K(0.1),
+  th.alpha = inv.link.f$alpha(1),
+  th.c = inv.link.f$c_(0.1),
+  th.p = inv.link.f$p(1.1)
+)
+
+fit.without.fix <- get_fit_and_plot(
+  link.f = link.f,
+  inv.link.f = inv.link.f,
+  th.init = th.init,
+  title = "Without Fix"
+)
+```
+
+```{r}
+fit.without.fix$plot
+```
+
+## Fix alpha to the true value and return the posterior
+```{r}
+link.f <- list(
+  mu = \(x) gamma_t(x, 0.3, 0.6),
+  K = \(x) unif_t(x, 0, 10),
+  alpha = \(x) unif_t(x, true.param$alpha, true.param$alpha),
+  c_ = \(x) unif_t(x, 0, 10),
+  p = \(x) unif_t(x, 1, 10)
+)
+
+# set inverse copula transformations list
+inv.link.f <- list(
+  mu = \(x) inv_gamma_t(x, 0.3, 0.6),
+  K = \(x) inv_unif_t(x, 0, 10),
+  alpha = \(x) inv_unif_t(x, true.param$alpha-(1e-8), true.param$alpha+(1e-8)),
+  c_ = \(x) inv_unif_t(x, 0, 10),
+  p = \(x) inv_unif_t(x, 1, 10)
+)
+
+# set up list of initial values
+th.init <- list(
+  th.mu = inv.link.f$mu(0.5),
+  th.K = inv.link.f$K(0.1),
+  th.alpha = inv.link.f$alpha(true.param$alpha),
+  th.c = inv.link.f$c_(0.1),
+  th.p = inv.link.f$p(1.1)
+)
+
+fit.fix.alpha <- get_fit_and_plot(
+  link.f = link.f,
+  inv.link.f = inv.link.f,
+  th.init = th.init,
+  title = "Fix alpha",
+  fix = "alpha"
+)
+```
+
+```{r}
+fit.fix.alpha$plot 
+```
+
+## Fix c to the true value and return the posterior
+```{r}
+link.f <- list(
+  mu = \(x) gamma_t(x, 0.3, 0.6),
+  K = \(x) unif_t(x, 0, 10),
+  alpha = \(x) unif_t(x, 0, 10),
+  c_ = \(x) unif_t(x, true.param$c-(1e-8), true.param$c+(1e-8)),
+  p = \(x) unif_t(x, 1, 10)
+)
+
+# set inverse copula transformations list
+inv.link.f <- list(
+  mu = \(x) inv_gamma_t(x, 0.3, 0.6),
+  K = \(x) inv_unif_t(x, 0, 10),
+  alpha = \(x) inv_unif_t(x, 0, 10),
+  c_ = \(x) inv_unif_t(x, true.param$c-(1e-8), true.param$c+(1e-8)),
+  p = \(x) inv_unif_t(x, 1, 10)
+)
+
+# set up list of initial values
+th.init <- list(
+  th.mu = inv.link.f$mu(0.5),
+  th.K = inv.link.f$K(0.1),
+  th.alpha = inv.link.f$alpha(1),
+  th.c = inv.link.f$c_(true.param$c),
+  th.p = inv.link.f$p(1.1)
+)
+
+fit.fix.c <- get_fit_and_plot(
+  link.f = link.f,
+  inv.link.f = inv.link.f,
+  th.init = th.init,
+  title = "Fix c",
+  fix = "c"
+)
+```
+
+```{r}
+fit.fix.c$plot
+```
+
+## Fix K to the true value and return the posterior
+```{r}
+link.f <- list(
+  mu = \(x) gamma_t(x, 0.3, 0.6),
+  K = \(x) unif_t(x, true.param$K-(1e-8), true.param$K+(1e-8)),
+  alpha = \(x) unif_t(x, 0, 10),
+  c_ = \(x) unif_t(x, 0, 10),
+  p = \(x) unif_t(x, 1, 10)
+)
+
+# set inverse copula transformations list
+inv.link.f <- list(
+  mu = \(x) inv_gamma_t(x, 0.3, 0.6),
+  K = \(x) inv_unif_t(x, true.param$K-(1e-8), true.param$K+(1e-8)),
+  alpha = \(x) inv_unif_t(x, 0, 10),
+  c_ = \(x) inv_unif_t(x, 0, 10),
+  p = \(x) inv_unif_t(x, 1, 10)
+)
+
+# set up list of initial values
+th.init <- list(
+  th.mu = inv.link.f$mu(0.5),
+  th.K = inv.link.f$K(true.param$K),
+  th.alpha = inv.link.f$alpha(1),
+  th.c = inv.link.f$c_(0.1),
+  th.p = inv.link.f$p(1.1)
+)
+
+fit.fix.K <- get_fit_and_plot(
+  link.f = link.f,
+  inv.link.f = inv.link.f,
+  th.init = th.init,
+  title = "Fix K",
+  fix = "K"
+)
+```
+
+```{r}
+fit.fix.K$plot
+```
+
+## Fix mu to the true value and return the posterior
+```{r}
+link.f <- list(
+  mu = \(x) gamma_t(x, true.param$mu-(1e-8), true.param$mu+(1e-8)),
+  K = \(x) unif_t(x, 0, 10),
+  alpha = \(x) unif_t(x, 0, 10),
+  c_ = \(x) unif_t(x, 0, 10),
+  p = \(x) unif_t(x, 1, 10)
+)
+
+# set inverse copula transformations list
+inv.link.f <- list(
+  mu = \(x) inv_gamma_t(x, true.param$mu-(1e-8), true.param$mu+(1e-8)),
+  K = \(x) inv_unif_t(x, 0, 10),
+  alpha = \(x) inv_unif_t(x, 0, 10),
+  c_ = \(x) inv_unif_t(x, 0, 10),
+  p = \(x) inv_unif_t(x, 1, 10)
+)
+
+# set up list of initial values
+th.init <- list(
+  th.mu = inv.link.f$mu(true.param$mu),
+  th.K = inv.link.f$K(0.1),
+  th.alpha = inv.link.f$alpha(1),
+  th.c = inv.link.f$c_(0.1),
+  th.p = inv.link.f$p(1.1)
+)
+
+fit.fix.mu <- get_fit_and_plot(
+  link.f = link.f,
+  inv.link.f = inv.link.f,
+  th.init = th.init,
+  title = "Fix mu",
+  fix = "mu"
+)
+```
+
+```{r}
+fit.fix.mu$plot
+```
+
+## Fix p to the true value and return the posterior
+```{r}
+link.f <- list(
+  mu = \(x) gamma_t(x, 0.3, 0.6),
+  K = \(x) unif_t(x, 0, 10),
+  alpha = \(x) unif_t(x, 0, 10),
+  c_ = \(x) unif_t(x, 0, 10),
+  p = \(x) unif_t(x, true.param$p-(1e-8), true.param$p+(1e-8))
+)
+
+# set inverse copula transformations list
+inv.link.f <- list(
+  mu = \(x) inv_gamma_t(x, 0.3, 0.6),
+  K = \(x) inv_unif_t(x, 0, 10),
+  alpha = \(x) inv_unif_t(x, 0, 10),
+  c_ = \(x) inv_unif_t(x, 0, 10),
+  p = \(x) inv_unif_t(x, true.param$p-(1e-8), true.param$p+(1e-8))
+)
+
+# set up list of initial values
+th.init <- list(
+  th.mu = inv.link.f$mu(0.5),
+  th.K = inv.link.f$K(0.1),
+  th.alpha = inv.link.f$alpha(1),
+  th.c = inv.link.f$c_(0.1),
+  th.p = inv.link.f$p(true.param$p)
+)
+
+fit.fix.p <- get_fit_and_plot(
+  link.f = link.f,
+  inv.link.f = inv.link.f,
+  th.init = th.init,
+  title = "Fix p",
+  fix = "p"
+)
+```
+
+```{r}
+fit.fix.p$plot
+```
+
+## mis-specify alpha to 3.0 and return the posterior
+```{r}
+link.f <- list(
+  mu = \(x) gamma_t(x, 0.3, 0.6),
+  K = \(x) unif_t(x, 0, 10),
+  alpha = \(x) unif_t(x, 3-1e-8, 3+1e-8),
+  c_ = \(x) unif_t(x, 0, 10),
+  p = \(x) unif_t(x, 1, 10)
+)
+
+# set inverse copula transformations list
+inv.link.f <- list(
+  mu = \(x) inv_gamma_t(x, 0.3, 0.6),
+  K = \(x) inv_unif_t(x, 0, 10),
+  alpha = \(x) inv_unif_t(x, 3-1e-8, 3+1e-8),
+  c_ = \(x) inv_unif_t(x, 0, 10),
+  p = \(x) inv_unif_t(x, 1, 10)
+)
+
+# set up list of initial values
+th.init <- list(
+  th.mu = inv.link.f$mu(0.5),
+  th.K = inv.link.f$K(0.1),
+  th.alpha = inv.link.f$alpha(3),
+  th.c = inv.link.f$c_(0.1),
+  th.p = inv.link.f$p(1.1)
+)
+
+fit.mis.alpha <- get_fit_and_plot(
+  link.f = link.f,
+  inv.link.f = inv.link.f,
+  th.init = th.init,
+  title = "Mis-specify alpha"
+)
+
+```
+
+```{r}
+fit.mis.alpha$plot
+```
+
+## mis-specify K to 0.3 and return the posterior
+```{r}
+link.f <- list(
+  mu = \(x) gamma_t(x, 0.3, 0.6),
+  K = \(x) unif_t(x, 0.3-1e-8, 0.3+1e-8),
+  alpha = \(x) unif_t(x, 0, 10),
+  c_ = \(x) unif_t(x, 0, 10),
+  p = \(x) unif_t(x, 1, 10)
+)
+
+# set inverse copula transformations list
+inv.link.f <- list(
+  mu = \(x) inv_gamma_t(x, 0.3, 0.6),
+  K = \(x) inv_unif_t(x, 0.3-1e-8, 0.3+1e-8),
+  alpha = \(x) inv_unif_t(x, 0, 10),
+  c_ = \(x) inv_unif_t(x, 0, 10),
+  p = \(x) inv_unif_t(x, 1, 10)
+)
+
+# set up list of initial values
+th.init <- list(
+  th.mu = inv_link.f$mu(0.5),
+  th.K = inv_link.f$K(0.3),
+  th.alpha = inv_link.f$alpha(1),
+  th.c = inv_link.f$c_(0.1),
+  th.p = inv_link.f$p(1.1)
+)
+
+fit.mis.K <- get_fit_and_plot(
+  link.f = link.f,
+  inv.link.f = inv.link.f,
+  th.init = th.init,
+  title = "Mis-specify K"
+)
+```
+
+```{r}
+fit.mis.K$plot
+```
