@@ -38,6 +38,10 @@ true.param <- list(
   mu = 0.30106014, K = 0.13611399, alpha = 2.43945301,
   c = 0.07098607, p = 1.17838741
 )
+df.true.param <- data.frame(
+  x = unlist(true.param),
+  param = names(true.param)
+)
 # set magnitude distribution parameter
 beta.p <- 2.353157
 # set cutoff magnitude
@@ -45,7 +49,7 @@ M0 <- 2.5
 # set starting time of the synthetic catalogue
 T1 <- 0
 # set end time of the synthetic catalogue
-T2 <- 365
+T2 <- 1000
 ```
 
 ```{r}
@@ -56,6 +60,7 @@ generate_synthetic_catalogue <- function(
     M0,
     T1,
     T2,
+    idx = NULL,
     Ht = NULL) {
   # generate the catalogue-1 - it returns a list of data.frames
   synth.cat.list <- generate_temporal_ETAS_synthetic(
@@ -67,6 +72,7 @@ generate_synthetic_catalogue <- function(
     Ht = Ht
   )
   synth.cat.df <- do.call(rbind, synth.cat.list)
+  synth.cat.df$idx <- as.integer(idx)
   return(synth.cat.df)
 }
 ```
@@ -86,6 +92,7 @@ synth.cat.df.1 <- generate_synthetic_catalogue(
   M0 = M0,
   T1 = T1,
   T2 = T2,
+  idx = 1,
   Ht = known.events.df.1
 )
 # create a dataframe containing the known events
@@ -100,6 +107,7 @@ synth.cat.df.2 <- generate_synthetic_catalogue(
   M0 = M0,
   T1 = T1,
   T2 = T2,
+  idx = 2,
   Ht = known.events.df.2
 )
 # create a dataframe containing the known events
@@ -114,6 +122,7 @@ synth.cat.df.3 <- generate_synthetic_catalogue(
   M0 = M0,
   T1 = T1,
   T2 = T2,
+    idx = 3,
   Ht = known.events.df.3
 )
 # create a dataframe containing the known events
@@ -128,6 +137,7 @@ synth.cat.df.4 <- generate_synthetic_catalogue(
   M0 = M0,
   T1 = T1,
   T2 = T2,
+  idx = 4,
   Ht = known.events.df.4
 )
 # create a dataframe containing the known events
@@ -142,6 +152,7 @@ synth.cat.df.5 <- generate_synthetic_catalogue(
   M0 = M0,
   T1 = T1,
   T2 = T2,
+  idx = 5,
   Ht = known.events.df.5
 )
 synth.cat.list <- list(
@@ -151,6 +162,7 @@ synth.cat.list <- list(
   synth.cat.df.4,
   synth.cat.df.5
 )
+
 ```
 
 ```{r}
@@ -164,17 +176,29 @@ colnames(synth.cat.df.1)
 ```{r}
 # create a function to plot the synthetic catalogues
 plot_synthetic_catalogue <- function(synth.cat.df, title) {
+  count_greater_than_4 <- sum(synth.cat.df$magnitudes >= 4)
   plt <- ggplot(synth.cat.df, aes(x = ts, y = magnitudes)) +
     geom_point() +
-    # mark the events with magnitude greater than 5
+    # mark the events with magnitude greater than 4
     geom_point(
-      data = synth.cat.df[synth.cat.df$magnitudes >= 5, ],
+      data = synth.cat.df[synth.cat.df$magnitudes >= 4, ],
       aes(x = ts, y = magnitudes), color = "red"
     ) +
-    theme_minimal() +
-    xlab("Time [days]") +
-    ylab("Magnitude") +
-    labs(title = title)
+  theme_bw() +
+  theme(
+   # text = element_text(size = 14),
+    plot.title = element_text(face = "bold"),
+    legend.position = "bottom",
+    strip.background = element_rect(fill = "white", color = "black"),
+    axis.title = element_text(face = "bold")
+  ) +
+  labs(x = "Time [days]", y = "Magnitude") +
+  labs(title = title)+
+  # Add the count of points with magnitudes greater than 4 to the title
+  annotate("text", x = Inf, y = Inf, 
+             label = paste("Count > 4:", count_greater_than_4), 
+             hjust = 1.1, vjust = 1.5, 
+             size = 4, color = "blue", fontface = "bold")
   return(plt)
 }
 ```
@@ -198,6 +222,32 @@ synth.cat.list <- lapply(synth.cat.list, function(df) {
   df$idx.p <- seq_len(nrow(df))
   return(df)
 })
+```
+
+```{r}
+# create a dataframe containing all catalogues
+synth.cat.df <- do.call(rbind, synth.cat.list)
+```
+
+```{r}
+# draw a viloin plot of the magnitudes
+# x is the category identifier
+ggplot(synth.cat.df, aes(x = as.factor(idx), y = magnitudes)) +
+  geom_violin(trim = FALSE, fill = "lightblue", color = "darkblue", alpha = 0.6) +
+  geom_jitter(width = 0.1, alpha = 0.7, color = "black", size = 1) +
+  geom_point(
+    data = synth.cat.df[synth.cat.df$magnitudes >= 4, ],
+    aes(x = as.factor(idx), y = magnitudes), color = "red", size = 2
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    axis.title = element_text(face = "bold"),
+    #axis.text.x = element_text(angle = 45, hjust = 1)
+  ) +
+  labs(x = "Category Number", y = "Magnitude") # +
+  # ggtitle("Violin Plot of Magnitudes")
+
 ```
 
 ## Model Fitting
@@ -298,21 +348,6 @@ ggplot(bind.post.df, aes(
 ## Plot the Marginal Posteriors (alpha)
 
 ```{r}
-# plot the marginal posteriors of alpha
-ggplot(
-  bind.post.df[bind.post.df$param == "alpha", ],
-  aes(x = x, y = y, color = cat.used, linetype = cat.used)
-) +
-  geom_line() +
-  xlab("alpha") +
-  ylab("pdf") +
-  geom_vline(
-    data = df.true.param[df.true.param$param == "alpha", ],
-    mapping = aes(xintercept = x), linetype = 2
-  )
-```
-
-```{r}
 # Plot the marginal posteriors of alpha
 ggplot(
   bind.post.df[bind.post.df$param == "alpha", ],
@@ -328,8 +363,9 @@ ggplot(
   scale_color_discrete(name = "Category") +
   scale_linetype_discrete(name = "Category") +
   theme_minimal() +
+  # ggtitle("Marginal Posterior Distributions of Alpha") +
   theme(
-    text = element_text(size = 14, family = "serif"),
+    text = element_text(size = 14),
     legend.title = element_text(size = 12, face = "bold"),
     legend.text = element_text(size = 10),
     legend.position = "bottom",
@@ -338,8 +374,7 @@ ggplot(
     axis.text = element_text(size = 12),
     panel.grid.major = element_line(color = "grey80"),
     panel.grid.minor = element_line(color = "grey90")
-  ) +
-  ggtitle("Marginal Posterior Distributions of Alpha")
+  ) 
 ```
 
 ```{r}
@@ -354,7 +389,7 @@ ggplot(bind.post.df[bind.post.df$param == "alpha", ], aes(x = x, y = cat.used)) 
   ) +
   theme_minimal() +
   theme(
-    text = element_text(size = 14, family = "serif"),
+    text = element_text(size = 14),
     legend.title = element_text(size = 12, face = "bold"),
     legend.text = element_text(size = 10),
     legend.position = "bottom",
@@ -366,16 +401,14 @@ ggplot(bind.post.df[bind.post.df$param == "alpha", ], aes(x = x, y = cat.used)) 
   ) +
   labs(
     x = expression(alpha),
-    y = "Category Used",
-    title = "Marginal Posterior Distributions of Alpha",
+    y = "Catalogue Used",
+   # title = "Marginal Posterior Distributions of Alpha",
     fill = "Credible Interval"
   )
+
 ```
 
 ```{r}
-library(ggplot2)
-library(ggdist)
-
 # Plot the marginal posteriors for all parameters with facets
 ggplot(bind.post.df, aes(x = x, y = cat.used)) +
   stat_slab(aes(fill = after_stat(level)), .width = c(.66, .95, .99, 1)) +
