@@ -155,9 +155,16 @@ synth.cat.df$dgen <- case_when(
 ## Plot the synthetic catalogues
 
 ```{r}
+# convert idx to integer
+synth.cat.df$idx <- as.integer(synth.cat.df$idx)
+# convert idx to factor and sort the levels
+synth.cat.df$idx <- factor(synth.cat.df$idx, levels = sort(unique(synth.cat.df$idx)))
+```
+
+```{r}
 library(ggplot2)
 library(dplyr)
-synth.cat.df %>%
+plot.synth <- synth.cat.df %>%
   ggplot(aes(x = ts, y = magnitudes)) +
   geom_point(aes(color = factor(dgen))) +
   facet_wrap(~idx, scales = "fixed", ncol = 2, labeller = as_labeller(function(x) {
@@ -169,12 +176,19 @@ synth.cat.df %>%
   })) +
   theme_bw() +
   theme(
-   # text = element_text(size = 14),
+    text = element_text(size = 14),
     legend.position = "bottom",
     strip.background = element_rect(fill = "white", color = "black"),
   ) +
   labs(x = "Time [days]", y = "Magnitude") +
-  scale_color_discrete(name = "Event Type") 
+  scale_color_discrete(name = "Event Type")
+
+
+plot.synth
+ggsave("q2-synth-cat-plot.png",
+  plot = plot.synth,
+  height = 8.27, width = 11.69, units = "in", dpi = 300
+)
 ```
 
 ## Fit the ETAS model to the synthetic catalogues
@@ -260,7 +274,7 @@ bind.post.df <- do.call(rbind, lapply(post_lists, function(x) x$post.df))
 ```{r}
 # Plot the marginal posterior distributions of the ETAS parameters
 plot.mp <- ggplot(bind.post.df, aes(x = x, y = y, color = cat.used, linetype = cat.used)) +
-  geom_line(size = 1) +
+  geom_line(size = 0.7) +
   facet_wrap(~param, scales = "free", ncol = 3) +
   xlab("Parameter Value") +
   ylab("Density") +
@@ -270,15 +284,18 @@ plot.mp <- ggplot(bind.post.df, aes(x = x, y = y, color = cat.used, linetype = c
   ) +
   theme_bw() +
   theme(
-   # text = element_text(size = 14),
+    text = element_text(size = 18),
     legend.position = "bottom",
     strip.background = element_rect(fill = "white", color = "black"),
   ) +
   labs(
-    color = "Category Used",
-    linetype = "Category Used"
+    color = "Catalogue Used",
+    linetype = "Catalogue Used"
   )
 
 plot.mp
-ggsave("marginal_posterior_distributions.pdf", plot.mp, width = 15, height = 10, dpi = 300)
+ggsave("q2-posterior-distributions.png",
+  plot = plot.mp,
+  height = 8.27, width = 11.69, units = "in", dpi = 300
+)
 ```

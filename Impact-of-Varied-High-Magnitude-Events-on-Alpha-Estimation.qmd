@@ -7,6 +7,7 @@ editor: visual
 ```{r}
 # delete all objects in the environment
 rm(list = ls())
+set.seed(123)
 ```
 
 ```{r}
@@ -22,10 +23,6 @@ library(ggdist)
 num.cores <- 12
 future::plan(future::multisession, workers = num.cores)
 INLA::inla.setOption(num.threads = num.cores)
-```
-
-```{r}
-set.seed(123)
 ```
 
 # Alpha
@@ -49,7 +46,7 @@ M0 <- 2.5
 # set starting time of the synthetic catalogue
 T1 <- 0
 # set end time of the synthetic catalogue
-T2 <- 1000
+T2 <- 365
 ```
 
 ```{r}
@@ -210,7 +207,8 @@ plots <- lapply(1:length(synth.cat.list), function(i) {
   plot_synthetic_catalogue(synth.cat.list[[i]], title)
 })
 # Arrange the plots in a column
-grid.arrange(grobs = plots, ncol = 1)
+plots <- grid.arrange(grobs = plots, ncol = 2)
+ggsave("q1-alpha-catalogue.png", plot = plots, width = 11.69, height = 8.27, units = "in", dpi = 300)
 ```
 
 ## Prepare the Data for Model Fitting
@@ -232,22 +230,24 @@ synth.cat.df <- do.call(rbind, synth.cat.list)
 ```{r}
 # draw a viloin plot of the magnitudes
 # x is the category identifier
-ggplot(synth.cat.df, aes(x = as.factor(idx), y = magnitudes)) +
+plot.violin <- ggplot(synth.cat.df, aes(x = as.factor(idx), y = magnitudes)) +
   geom_violin(trim = FALSE, fill = "lightblue", color = "darkblue", alpha = 0.6) +
   geom_jitter(width = 0.1, alpha = 0.7, color = "black", size = 1) +
   geom_point(
     data = synth.cat.df[synth.cat.df$magnitudes >= 4, ],
     aes(x = as.factor(idx), y = magnitudes), color = "red", size = 2
   ) +
-  theme_minimal() +
+  theme_bw() +
   theme(
     plot.title = element_text(hjust = 0.5, face = "bold"),
-    axis.title = element_text(face = "bold"),
-    #axis.text.x = element_text(angle = 45, hjust = 1)
+    axis.title = element_text(face = "bold",size = 15),
+    axis.text.x = element_text(angle = 45, hjust = 1)
   ) +
-  labs(x = "Category Number", y = "Magnitude") # +
+  labs(x = "Catalogue Number", y = "Magnitude") # +
   # ggtitle("Violin Plot of Magnitudes")
 
+plot.violin
+ggsave("q1-alpha-violin.png", plot = plot.violin, width = 11.69, height = 8.27, units = "in", dpi = 300)
 ```
 
 ## Model Fitting
@@ -379,7 +379,7 @@ ggplot(
 
 ```{r}
 # Plot the marginal posteriors of alpha with additional visual enhancements
-ggplot(bind.post.df[bind.post.df$param == "alpha", ], aes(x = x, y = cat.used)) +
+plot.posters <- ggplot(bind.post.df[bind.post.df$param == "alpha", ], aes(x = x, y = cat.used)) +
   stat_slab(aes(fill = after_stat(level)), .width = c(.66, .95, .99, 1)) +
   stat_pointinterval() +
   scale_fill_brewer(palette = "Blues", na.translate = FALSE, name = "Credible Level") +
@@ -387,15 +387,15 @@ ggplot(bind.post.df[bind.post.df$param == "alpha", ], aes(x = x, y = cat.used)) 
     data = df.true.param[df.true.param$param == "alpha", ],
     aes(xintercept = x), linetype = 2, color = "red", size = 1
   ) +
-  theme_minimal() +
+  theme_bw() +
   theme(
     text = element_text(size = 14),
-    legend.title = element_text(size = 12, face = "bold"),
-    legend.text = element_text(size = 10),
+    legend.title = element_text(size = 14, face = "bold"),
+    legend.text = element_text(size = 12),
     legend.position = "bottom",
     plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
     axis.title = element_text(size = 14),
-    axis.text = element_text(size = 12),
+    axis.text = element_text(size = 15),
     panel.grid.major = element_line(color = "grey80"),
     panel.grid.minor = element_line(color = "grey90")
   ) +
@@ -405,7 +405,8 @@ ggplot(bind.post.df[bind.post.df$param == "alpha", ], aes(x = x, y = cat.used)) 
    # title = "Marginal Posterior Distributions of Alpha",
     fill = "Credible Interval"
   )
-
+plot.posters
+ggsave("q1-alpha-posteriors.png", plot = plot.posters, width = 11.69, height = 8.27, units = "in", dpi = 300)
 ```
 
 ```{r}
@@ -432,7 +433,7 @@ ggplot(bind.post.df, aes(x = x, y = cat.used)) +
     strip.text = element_text(size = 12, face = "bold")
   ) +
   labs(
-    x = expression(alpha),
+    x = "Value",
     y = "Category Used",
     title = "Marginal Posterior Distributions",
     fill = "Credible Interval"
