@@ -66,64 +66,69 @@ synth.cat.df$dgen <- case_when(
 names(synth.cat.df)
 # > names(synth.cat.df)
 # [1] "ts"         "magnitudes" "gen"
-# reordering colu 
+# reordering colu
 ```
 
 ## Create a function to fix the parameters and return the posterior
 ```{r}
-get_fit_and_plot <- function(link.f, inv.link.f, th.init, title, fix=NULL) {
-    # set up list of bru options
-    bru.opt.list <- list(
-        bru_verbose = 0, # type of visual output
-        bru_max_iter = 70, # maximum number of iterations
-        # bru_method = list(max_step = 0.5),
-        bru_initial = th.init
-    ) # parameters initial values
-    
-    fit <- Temporal.ETAS(
-        total.data = synth.cat.df,
-        M0 = M0,
-        T1 = T1,
-        T2 = T2,
-        link.functions = link.f,
-        coef.t. = 1,
-        delta.t. = 0.1,
-        N.max. = 5,
-        bru.opt = bru.opt.list
-    )
-    
-    input.list <- list(model.fit = fit, link.functions = link.f)
-    post <- get_posterior_param(input.list = input.list)
-    
-    df.true.param.filtered <- df.true.param
-    if (!is.null(fix)) {
-        post$post.df <- post$post.df %>% filter(param != fix)
-        df.true.param.filtered <- df.true.param %>% filter(param != fix)
-    }
+get_fit_and_plot <- function(link.f, inv.link.f, th.init, title, fix = NULL) {
+  # set up list of bru options
+  bru.opt.list <- list(
+    bru_verbose = 0, # type of visual output
+    bru_max_iter = 70, # maximum number of iterations
+    # bru_method = list(max_step = 0.5),
+    bru_initial = th.init
+  ) # parameters initial values
 
-    plot <- ggplot(post$post.df, aes(x = x, y = y)) +
-        geom_line(size = 1) +
-        facet_wrap(~param, scales = "free", ncol = 3) +
-        xlab("Parameter Value") +
-        ylab("Density") +
-        geom_vline(
-        data = df.true.param.filtered,
-        aes(xintercept = x), linetype = 2, color = "black", size = 1
-        ) +
-        theme_bw() +
-        theme(
-        # text = element_text(size = 14),
-        legend.position = "bottom",
-        strip.background = element_rect(fill = "white", color = "black"),
-        ) + ggtitle(title)
+  fit <- Temporal.ETAS(
+    total.data = synth.cat.df,
+    M0 = M0,
+    T1 = T1,
+    T2 = T2,
+    link.functions = link.f,
+    coef.t. = 1,
+    delta.t. = 0.1,
+    N.max. = 5,
+    bru.opt = bru.opt.list
+  )
 
-    return(list(fit = fit, post = post, plot = plot))
+  input.list <- list(model.fit = fit, link.functions = link.f)
+  post <- get_posterior_param(input.list = input.list)
+
+  df.true.param.filtered <- df.true.param
+  if (!is.null(fix)) {
+    post$post.df <- post$post.df %>% filter(param != fix)
+    df.true.param.filtered <- df.true.param %>% filter(param != fix)
+  }
+
+  ncol <- if (is.null(fix)) {
+    3
+  } else {
+    4
+  }
+  plot <- ggplot(post$post.df, aes(x = x, y = y)) +
+    geom_line(size = 1) +
+    facet_wrap(~param, scales = "free", ncol = ncol) +
+    xlab("Parameter Value") +
+    ylab("Density") +
+    geom_vline(
+      data = df.true.param.filtered,
+      aes(xintercept = x), linetype = 2, color = "black", size = 1
+    ) +
+    theme_bw() +
+    theme(
+      text = element_text(size = 14),
+      legend.position = "bottom",
+      strip.background = element_rect(fill = "white", color = "black"),
+    ) +
+    ggtitle(title)
+
+  return(list(fit = fit, post = post, plot = plot))
 }
 ```
 
 ## Without Fix the parameters and return the posterior
 ```{r}
-
 link.f <- list(
   mu = \(x) gamma_t(x, 0.3, 0.6),
   K = \(x) unif_t(x, 0, 10),
@@ -154,12 +159,13 @@ fit.without.fix <- get_fit_and_plot(
   link.f = link.f,
   inv.link.f = inv.link.f,
   th.init = th.init,
-  title = "Without Fix"
+  title = "Parameter Estimation Without Fixing Any Parameters"
 )
 ```
 
 ```{r}
 fit.without.fix$plot
+ggsave("q3-without-fix.png", height = 8.27, width = 11.69, units = "in")
 ```
 
 ## Fix alpha to the true value and return the posterior
@@ -176,7 +182,7 @@ link.f <- list(
 inv.link.f <- list(
   mu = \(x) inv_gamma_t(x, 0.3, 0.6),
   K = \(x) inv_unif_t(x, 0, 10),
-  alpha = \(x) inv_unif_t(x, true.param$alpha-(1e-8), true.param$alpha+(1e-8)),
+  alpha = \(x) inv_unif_t(x, true.param$alpha - (1e-8), true.param$alpha + (1e-8)),
   c_ = \(x) inv_unif_t(x, 0, 10),
   p = \(x) inv_unif_t(x, 1, 10)
 )
@@ -194,13 +200,13 @@ fit.fix.alpha <- get_fit_and_plot(
   link.f = link.f,
   inv.link.f = inv.link.f,
   th.init = th.init,
-  title = "Fix alpha",
+  title = "Parameter alpha Fixed at True Value",
   fix = "alpha"
 )
 ```
 
 ```{r}
-fit.fix.alpha$plot 
+fit.fix.alpha$plot
 ```
 
 ## Fix c to the true value and return the posterior
@@ -209,7 +215,7 @@ link.f <- list(
   mu = \(x) gamma_t(x, 0.3, 0.6),
   K = \(x) unif_t(x, 0, 10),
   alpha = \(x) unif_t(x, 0, 10),
-  c_ = \(x) unif_t(x, true.param$c-(1e-8), true.param$c+(1e-8)),
+  c_ = \(x) unif_t(x, true.param$c - (1e-8), true.param$c + (1e-8)),
   p = \(x) unif_t(x, 1, 10)
 )
 
@@ -218,7 +224,7 @@ inv.link.f <- list(
   mu = \(x) inv_gamma_t(x, 0.3, 0.6),
   K = \(x) inv_unif_t(x, 0, 10),
   alpha = \(x) inv_unif_t(x, 0, 10),
-  c_ = \(x) inv_unif_t(x, true.param$c-(1e-8), true.param$c+(1e-8)),
+  c_ = \(x) inv_unif_t(x, true.param$c - (1e-8), true.param$c + (1e-8)),
   p = \(x) inv_unif_t(x, 1, 10)
 )
 
@@ -235,7 +241,7 @@ fit.fix.c <- get_fit_and_plot(
   link.f = link.f,
   inv.link.f = inv.link.f,
   th.init = th.init,
-  title = "Fix c",
+  title = "Parameter c Fixed at True Value",
   fix = "c"
 )
 ```
@@ -248,7 +254,7 @@ fit.fix.c$plot
 ```{r}
 link.f <- list(
   mu = \(x) gamma_t(x, 0.3, 0.6),
-  K = \(x) unif_t(x, true.param$K-(1e-8), true.param$K+(1e-8)),
+  K = \(x) unif_t(x, true.param$K - (1e-8), true.param$K + (1e-8)),
   alpha = \(x) unif_t(x, 0, 10),
   c_ = \(x) unif_t(x, 0, 10),
   p = \(x) unif_t(x, 1, 10)
@@ -257,7 +263,7 @@ link.f <- list(
 # set inverse copula transformations list
 inv.link.f <- list(
   mu = \(x) inv_gamma_t(x, 0.3, 0.6),
-  K = \(x) inv_unif_t(x, true.param$K-(1e-8), true.param$K+(1e-8)),
+  K = \(x) inv_unif_t(x, true.param$K - (1e-8), true.param$K + (1e-8)),
   alpha = \(x) inv_unif_t(x, 0, 10),
   c_ = \(x) inv_unif_t(x, 0, 10),
   p = \(x) inv_unif_t(x, 1, 10)
@@ -276,7 +282,7 @@ fit.fix.K <- get_fit_and_plot(
   link.f = link.f,
   inv.link.f = inv.link.f,
   th.init = th.init,
-  title = "Fix K",
+  title = "Parameter K Fixed at True Value",
   fix = "K"
 )
 ```
@@ -288,7 +294,7 @@ fit.fix.K$plot
 ## Fix mu to the true value and return the posterior
 ```{r}
 link.f <- list(
-  mu = \(x) gamma_t(x, true.param$mu-(1e-8), true.param$mu+(1e-8)),
+  mu = \(x) gamma_t(x, true.param$mu - (1e-8), true.param$mu + (1e-8)),
   K = \(x) unif_t(x, 0, 10),
   alpha = \(x) unif_t(x, 0, 10),
   c_ = \(x) unif_t(x, 0, 10),
@@ -297,7 +303,7 @@ link.f <- list(
 
 # set inverse copula transformations list
 inv.link.f <- list(
-  mu = \(x) inv_gamma_t(x, true.param$mu-(1e-8), true.param$mu+(1e-8)),
+  mu = \(x) inv_gamma_t(x, true.param$mu - (1e-8), true.param$mu + (1e-8)),
   K = \(x) inv_unif_t(x, 0, 10),
   alpha = \(x) inv_unif_t(x, 0, 10),
   c_ = \(x) inv_unif_t(x, 0, 10),
@@ -317,7 +323,7 @@ fit.fix.mu <- get_fit_and_plot(
   link.f = link.f,
   inv.link.f = inv.link.f,
   th.init = th.init,
-  title = "Fix mu",
+  title = "Parameter mu Fixed at True Value",
   fix = "mu"
 )
 ```
@@ -333,7 +339,7 @@ link.f <- list(
   K = \(x) unif_t(x, 0, 10),
   alpha = \(x) unif_t(x, 0, 10),
   c_ = \(x) unif_t(x, 0, 10),
-  p = \(x) unif_t(x, true.param$p-(1e-8), true.param$p+(1e-8))
+  p = \(x) unif_t(x, true.param$p - (1e-8), true.param$p + (1e-8))
 )
 
 # set inverse copula transformations list
@@ -342,7 +348,7 @@ inv.link.f <- list(
   K = \(x) inv_unif_t(x, 0, 10),
   alpha = \(x) inv_unif_t(x, 0, 10),
   c_ = \(x) inv_unif_t(x, 0, 10),
-  p = \(x) inv_unif_t(x, true.param$p-(1e-8), true.param$p+(1e-8))
+  p = \(x) inv_unif_t(x, true.param$p - (1e-8), true.param$p + (1e-8))
 )
 
 # set up list of initial values
@@ -358,7 +364,7 @@ fit.fix.p <- get_fit_and_plot(
   link.f = link.f,
   inv.link.f = inv.link.f,
   th.init = th.init,
-  title = "Fix p",
+  title = "Parameter p Fixed at True Value",
   fix = "p"
 )
 ```
@@ -367,12 +373,28 @@ fit.fix.p <- get_fit_and_plot(
 fit.fix.p$plot
 ```
 
+## Stack the plots
+```{r}
+library(gridExtra)
+plot.true <- grid.arrange(
+  fit.fix.alpha$plot,
+  fit.fix.c$plot,
+  fit.fix.K$plot,
+  fit.fix.mu$plot,
+  fit.fix.p$plot,
+  ncol = 1
+)
+plot.true
+# save the plot
+ggsave("q3-fix-the-parameter.png", plot.true, width = 8.27, height = 11.69, units = "in")
+```
+
 ## mis-specify alpha to 3.0 and return the posterior
 ```{r}
 link.f <- list(
   mu = \(x) gamma_t(x, 0.3, 0.6),
   K = \(x) unif_t(x, 0, 10),
-  alpha = \(x) unif_t(x, 3-1e-8, 3+1e-8),
+  alpha = \(x) unif_t(x, 3 - 1e-8, 3 + 1e-8),
   c_ = \(x) unif_t(x, 0, 10),
   p = \(x) unif_t(x, 1, 10)
 )
@@ -381,7 +403,7 @@ link.f <- list(
 inv.link.f <- list(
   mu = \(x) inv_gamma_t(x, 0.3, 0.6),
   K = \(x) inv_unif_t(x, 0, 10),
-  alpha = \(x) inv_unif_t(x, 3-1e-8, 3+1e-8),
+  alpha = \(x) inv_unif_t(x, 3 - 1e-8, 3 + 1e-8),
   c_ = \(x) inv_unif_t(x, 0, 10),
   p = \(x) inv_unif_t(x, 1, 10)
 )
@@ -399,21 +421,20 @@ fit.mis.alpha <- get_fit_and_plot(
   link.f = link.f,
   inv.link.f = inv.link.f,
   th.init = th.init,
-  title = "Mis-specify alpha",
+  title = "Posterior Distribution with Mis-specified alpha",
   fix = "alpha"
 )
-
 ```
 
 ```{r}
-fit.mis.alpha$plot
+fit.mis.alpha$plot <- fit.mis.alpha$plot + labs(subtitle = "True alpha = 2.439, Mis-specified alpha = 3.0")
 ```
 
 ## mis-specify K to 0.3 and return the posterior
 ```{r}
 link.f <- list(
   mu = \(x) gamma_t(x, 0.3, 0.6),
-  K = \(x) unif_t(x, 0.3-1e-8, 0.3+1e-8),
+  K = \(x) unif_t(x, 0.3 - 1e-8, 0.3 + 1e-8),
   alpha = \(x) unif_t(x, 0, 10),
   c_ = \(x) unif_t(x, 0, 10),
   p = \(x) unif_t(x, 1, 10)
@@ -422,7 +443,7 @@ link.f <- list(
 # set inverse copula transformations list
 inv.link.f <- list(
   mu = \(x) inv_gamma_t(x, 0.3, 0.6),
-  K = \(x) inv_unif_t(x, 0.3-1e-8, 0.3+1e-8),
+  K = \(x) inv_unif_t(x, 0.3 - 1e-8, 0.3 + 1e-8),
   alpha = \(x) inv_unif_t(x, 0, 10),
   c_ = \(x) inv_unif_t(x, 0, 10),
   p = \(x) inv_unif_t(x, 1, 10)
@@ -441,11 +462,24 @@ fit.mis.K <- get_fit_and_plot(
   link.f = link.f,
   inv.link.f = inv.link.f,
   th.init = th.init,
-  title = "Mis-specify K",
+  title = "Posterior Distribution with Mis-specified K",
   fix = "K"
 )
 ```
 
 ```{r}
-fit.mis.K$plot
+# add subtitle to tell the true value of K and the mis-specified value
+fit.mis.K$plot <- fit.mis.K$plot + labs(subtitle = "True K = 0.136, Mis-specified K = 0.3")
+```
+
+## Stack the plots
+```{r}
+plot.mis <- grid.arrange(
+  fit.mis.alpha$plot,
+  fit.mis.K$plot,
+  ncol = 1
+)
+plot.mis
+# save the plot
+ggsave("q3-mis-specify-the-parameter.png", plot.mis, width = 11.69, height = 8.27, units = "in")
 ```
