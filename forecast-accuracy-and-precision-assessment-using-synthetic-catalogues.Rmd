@@ -6,20 +6,25 @@ output: pdf_document
 Author: Zhile Xu
 UUN: s2500393
 
+The code below assesses the forecast accuracy and precision of ETAS models using synthetic earthquake catalogues. The analysis includes setting up the environment, generating synthetic data, fitting the ETAS model, and evaluating its performance under different scenarios.
+
 ## Set up the environment
 
 ```{r}
+# Remove all objects from the current R environment to start fresh
 rm(list = ls())
 ```
 
 
 ```{r}
+# Load the required libraries
 library(ETAS.inlabru)
 library(tidyverse)
 set.seed(123)
 ```
 
 ```{r}
+# Set the number of cores to use for parallel processing
 num.cores <- 12
 future::plan(future::multisession, workers = num.cores)
 INLA::inla.setOption(num.threads = num.cores)
@@ -28,7 +33,7 @@ INLA::inla.setOption(num.threads = num.cores)
 
 # Fit the model to the synthetic catalogue
 
-### simulate data
+### Generate the synthetic catalogue
 ```{r}
 # set true ETAS parameters
 true.param <- list(
@@ -286,11 +291,6 @@ post.samp.seeded.400 <- post_sampling(
 ```
 
 ### Forecasting
-
-```{r}
-synth.seeded.400.df
-```
-
 
 ```{r}
 beta.p <- 1 / (mean(synth.seeded.400.df$magnitudes) - M0)

@@ -4,20 +4,27 @@ output: pdf_document
 ---
 
 Author: Zhile Xu
+
 UUN: s2500393
 
+The code below explores the impact of sequence characteristics on the posterior changes of ETAS model parameters using synthetic earthquake catalogues. The analysis includes setting up the environment, generating synthetic data, fitting the ETAS model, and evaluating its performance under various scenarios.
+
+## Set up the environment
+
 ```{r}
+# Remove all objects from the current R environment to start fresh
 rm(list = ls())
 ```
 
-
 ```{r}
+# Load the required libraries
 library(ETAS.inlabru)
 library(tidyverse)
 set.seed(123)
 ```
 
 ```{r}
+# Set up parallel processing
 num.cores <- 12
 future::plan(future::multisession, workers = num.cores)
 INLA::inla.setOption(num.threads = num.cores)
@@ -47,7 +54,7 @@ T2 <- 1000
 ## Define a function to generate synthetic catalogues
 
 ```{r}
-# a function to generate synthetic catalogues
+# Define a function to generate synthetic catalogues
 generate_synthetic_catalogue <- function(
     theta,
     beta.p,
@@ -56,7 +63,6 @@ generate_synthetic_catalogue <- function(
     T2,
     Ht = NULL,
     idx = NULL) {
-  # generate the catalogue-1 - it returns a list of data.frames
   synth.cat.list <- generate_temporal_ETAS_synthetic(
     theta = theta,
     beta.p = beta.p,
@@ -75,8 +81,7 @@ generate_synthetic_catalogue <- function(
 ## Generate synthetic catalogues
 
 ```{r}
-# create 10 synthetic catalogue with the same parameters
-# use a loop to generate 5 synthetic catalogues and store them in a list
+# Generate 10 synthetic catalogues
 synth.cat.list <- lapply(1:10, function(i) {
   generate_synthetic_catalogue(
     theta = true.param,
@@ -95,22 +100,12 @@ synth.cat.list <- lapply(synth.cat.list, function(df) {
 })
 ```
 
-
 ```{r}
-names(synth.cat.list[[1]])
-# > names(synth.cat.list[[1]])
-# [1] "ts"         "magnitudes" "gen"
-```
-
-
-```{r}
-# convert the list of data.frames to a single tibble
-# add an index column to the data.frame
+# Bind the synthetic catalogues into a single data.frame
 synth.cat.df <- bind_rows(synth.cat.list, .id = "idx")
 synth.cat.df <- synth.cat.df %>% tibble()
 
-# compare the number of events in the synthetic catalogues
-# sort the synthetic catalogues by the index
+# Add columns to the synthetic catalogue data to store the number of events
 count_df <- synth.cat.df %>%
   group_by(idx) %>%
   summarise(
@@ -119,58 +114,31 @@ count_df <- synth.cat.df %>%
     N.after = sum(gen > 1)
   ) %>%
   arrange(idx)
-# > count_df
-# # A tibble: 10 × 4
-#      idx     N N.bkg N.after
-#    <int> <int> <int>   <int>
-#  1     1   133   108      25
-#  2     2   238    93     145
-#  3     3   178   110      68
-#  4     4   806   115     691
-#  5     5   115   101      14
-#  6     6   149   106      43
-#  7     7   145   112      33
-#  8     8   194   112      82
-#  9     9   148   104      44
-# 10    10   143   113      30
 
-# add the count data to the synthetic catalogue data
+# Add the count data to the synthetic catalogue data
 synth.cat.df <- left_join(synth.cat.df, count_df, by = "idx")
 
-# add a column to the synthetic catalogue data to indicate the
-# generation of the event gen = 1 for background events and gen > 1 for
-# triggered events and other events
+# Add a column to the synthetic catalogue data to indicate the event type
 synth.cat.df$dgen <- case_when(
   synth.cat.df$gen == 1 ~ "Background",
   synth.cat.df$gen > 1 ~ "Triggered",
   .default = "Other"
 )
 
-# > head(synth.cat.df)
-# # A tibble: 6 × 7
-#     idx     ts magnitudes   gen     N N.bkg N.after
-#   <int>  <dbl>      <dbl> <dbl> <int> <int>   <int>
-# 1     1 356.         2.63     1   133   108      25
-# 2     1 249.         2.52     1   133   108      25
-# 3     1 306.         3.05     1   133   108      25
-# 4     1 144.         2.86     1   133   108      25
-# 5     1 325.         2.73     1   133   108      25
-# 6     1   9.32       2.52     1   133   108      25
 ```
 
-## Plot the synthetic catalogues
+## Plot the synthetic catalogues to visualise the distribution of events
 
 ```{r}
-# convert idx to integer
+# Convert idx to integer
 synth.cat.df$idx <- as.integer(synth.cat.df$idx)
-# convert idx to factor and sort the levels
+# Convert idx to factor and sort the levels
 synth.cat.df$idx <- factor(synth.cat.df$idx,
   levels = sort(unique(synth.cat.df$idx))
 )
 ```
 
 ```{r}
-library(ggplot2)
 library(dplyr)
 plot.synth <- synth.cat.df %>%
   ggplot(aes(x = ts, y = magnitudes)) +
@@ -194,7 +162,6 @@ plot.synth <- synth.cat.df %>%
   ) +
   labs(x = "Time [days]", y = "Magnitude") +
   scale_color_discrete(name = "Event Type")
-
 
 plot.synth
 ggsave("q2-synth-cat-plot.png",
@@ -261,7 +228,7 @@ fit.list <- lapply(synth.cat.list, function(synth.cat.df) {
 })
 ```
 
-## Plot the ETAS model results
+## Plot the ETAS model posterior distributions
 
 ```{r}
 # create a list of model fitting results
