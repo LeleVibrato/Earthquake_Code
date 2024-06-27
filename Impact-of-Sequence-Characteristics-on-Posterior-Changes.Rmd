@@ -1,8 +1,10 @@
 ---
-title: "large amount"
-output: html_document
-date: "2024-06-08"
+title: "Impact of Sequence Characteristics on Posterior Changes"
+output: pdf_document
 ---
+
+Author: Zhile Xu
+UUN: s2500393
 
 ```{r}
 rm(list = ls())
@@ -24,7 +26,10 @@ INLA::inla.setOption(num.threads = num.cores)
 ## Set the true ETAS parameters
 ```{r}
 # set true ETAS parameters
-true.param <- list(mu = 0.30106014, K = 0.13611399, alpha = 2.43945301, c = 0.07098607, p = 1.17838741)
+true.param <- list(
+  mu = 0.30106014, K = 0.13611399, alpha = 2.43945301,
+  c = 0.07098607, p = 1.17838741
+)
 df.true.param <- data.frame(
   x = unlist(true.param),
   param = names(true.param)
@@ -132,8 +137,9 @@ count_df <- synth.cat.df %>%
 # add the count data to the synthetic catalogue data
 synth.cat.df <- left_join(synth.cat.df, count_df, by = "idx")
 
-# add a column to the synthetic catalogue data to indicate the generation of the event
-# gen = 1 for background events and gen > 1 for triggered events and other events
+# add a column to the synthetic catalogue data to indicate the
+# generation of the event gen = 1 for background events and gen > 1 for
+# triggered events and other events
 synth.cat.df$dgen <- case_when(
   synth.cat.df$gen == 1 ~ "Background",
   synth.cat.df$gen > 1 ~ "Triggered",
@@ -158,7 +164,9 @@ synth.cat.df$dgen <- case_when(
 # convert idx to integer
 synth.cat.df$idx <- as.integer(synth.cat.df$idx)
 # convert idx to factor and sort the levels
-synth.cat.df$idx <- factor(synth.cat.df$idx, levels = sort(unique(synth.cat.df$idx)))
+synth.cat.df$idx <- factor(synth.cat.df$idx,
+  levels = sort(unique(synth.cat.df$idx))
+)
 ```
 
 ```{r}
@@ -167,13 +175,17 @@ library(dplyr)
 plot.synth <- synth.cat.df %>%
   ggplot(aes(x = ts, y = magnitudes)) +
   geom_point(aes(color = factor(dgen))) +
-  facet_wrap(~idx, scales = "fixed", ncol = 2, labeller = as_labeller(function(x) {
-    paste0(
-      "Catalogue ", x, ", N = ", unique(synth.cat.df$N[synth.cat.df$idx == x]),
-      ", N.bkg = ", unique(synth.cat.df$N.bkg[synth.cat.df$idx == x]), ", N.after = ",
-      unique(synth.cat.df$N.after[synth.cat.df$idx == x])
-    )
-  })) +
+  facet_wrap(~idx,
+    scales = "fixed", ncol = 2,
+    labeller = as_labeller(function(x) {
+      paste0(
+        "Catalogue ", x, ", N = ", unique(synth.cat.df$N[synth.cat.df$idx == x]),
+        ", N.bkg = ", unique(synth.cat.df$N.bkg[synth.cat.df$idx == x]),
+        ", N.after = ",
+        unique(synth.cat.df$N.after[synth.cat.df$idx == x])
+      )
+    })
+  ) +
   theme_bw() +
   theme(
     text = element_text(size = 14),
@@ -273,7 +285,10 @@ bind.post.df <- do.call(rbind, lapply(post_lists, function(x) x$post.df))
 
 ```{r}
 # Plot the marginal posterior distributions of the ETAS parameters
-plot.mp <- ggplot(bind.post.df, aes(x = x, y = y, color = cat.used, linetype = cat.used)) +
+plot.mp <- ggplot(bind.post.df, aes(
+  x = x, y = y,
+  color = cat.used, linetype = cat.used
+)) +
   geom_line(size = 0.7) +
   facet_wrap(~param, scales = "free", ncol = 3) +
   xlab("Parameter Value") +

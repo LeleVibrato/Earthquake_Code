@@ -1,8 +1,10 @@
 ---
-title: "fix the parameter"
-output: html_document
-date: "2024-06-09"
+title: "Impact of Parameter Fixation on Posterior Distributions"
+output: pdf_document
 ---
+
+Author: Zhile Xu
+UUN: s2500393
 
 ```{r}
 rm(list = ls())
@@ -24,7 +26,10 @@ INLA::inla.setOption(num.threads = num.cores)
 ## simulate data
 ```{r}
 # set true ETAS parameters
-true.param <- list(mu = 0.30106014, K = 0.13611399, alpha = 2.43945301, c = 0.07098607, p = 1.17838741)
+true.param <- list(
+  mu = 0.30106014, K = 0.13611399,
+  alpha = 2.43945301, c = 0.07098607, p = 1.17838741
+)
 df.true.param <- data.frame(
   x = unlist(true.param),
   param = names(true.param)
@@ -386,7 +391,10 @@ plot.true <- grid.arrange(
 )
 plot.true
 # save the plot
-ggsave("q3-fix-the-parameter.png", plot.true, width = 8.27, height = 11.69, units = "in")
+ggsave("q3-fix-the-parameter.png", plot.true,
+  width = 8.27,
+  height = 11.69, units = "in"
+)
 ```
 
 ## mis-specify alpha to 3.0 and return the posterior
@@ -427,7 +435,8 @@ fit.mis.alpha <- get_fit_and_plot(
 ```
 
 ```{r}
-fit.mis.alpha$plot <- fit.mis.alpha$plot + labs(subtitle = "True alpha = 2.439, Mis-specified alpha = 3.0")
+fit.mis.alpha$plot <- fit.mis.alpha$plot +
+  labs(subtitle = "True alpha = 2.439, Mis-specified alpha = 3.0")
 ```
 
 ## mis-specify K to 0.3 and return the posterior
@@ -469,7 +478,8 @@ fit.mis.K <- get_fit_and_plot(
 
 ```{r}
 # add subtitle to tell the true value of K and the mis-specified value
-fit.mis.K$plot <- fit.mis.K$plot + labs(subtitle = "True K = 0.136, Mis-specified K = 0.3")
+fit.mis.K$plot <- fit.mis.K$plot +
+  labs(subtitle = "True K = 0.136, Mis-specified K = 0.3")
 ```
 
 ## Stack the plots
@@ -481,5 +491,8 @@ plot.mis <- grid.arrange(
 )
 plot.mis
 # save the plot
-ggsave("q3-mis-specify-the-parameter.png", plot.mis, width = 11.69, height = 8.27, units = "in")
+ggsave("q3-mis-specify-the-parameter.png",
+  plot.mis,
+  width = 11.69, height = 8.27, units = "in"
+)
 ```

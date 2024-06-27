@@ -1,8 +1,10 @@
 ---
-title: "prediction"
-output: html_document
-date: "2024-06-11"
+title: "Forecast Accuracy and Precision Assessment Using Synthetic Catalogues"
+output: pdf_document
 ---
+
+Author: Zhile Xu
+UUN: s2500393
 
 ## Set up the environment
 
@@ -29,7 +31,10 @@ INLA::inla.setOption(num.threads = num.cores)
 ### simulate data
 ```{r}
 # set true ETAS parameters
-true.param <- list(mu = 0.30106014, K = 0.13611399, alpha = 2.43945301, c = 0.07098607, p = 1.17838741)
+true.param <- list(
+  mu = 0.30106014, K = 0.13611399,
+  alpha = 2.43945301, c = 0.07098607, p = 1.17838741
+)
 df.true.param <- data.frame(
   x = unlist(true.param),
   param = names(true.param)
@@ -184,8 +189,13 @@ N.obs <- sum(synth.unseeded$ts >= T1.fore & synth.unseeded$ts <= T2.fore)
 
 # Create the plot
 plot.fore.unseeded <- ggplot() +
-  geom_histogram(aes(x = N.fore, y = after_stat(density)), binwidth = 1, alpha = 0.7) +
-  geom_vline(xintercept = N.obs, color = "red", linetype = "dashed", size = 1) +
+  geom_histogram(aes(x = N.fore, y = after_stat(density)),
+    binwidth = 1, alpha = 0.7
+  ) +
+  geom_vline(
+    xintercept = N.obs, color = "red",
+    linetype = "dashed", size = 1
+  ) +
   xlim(0, 800) +
   labs(
     title = "Unseeded ETAS forecast",
@@ -244,7 +254,8 @@ plot.synth.seeded.400
 ### Fit the model
 ```{r}
 # create a training dataset
-synth.seeded.400.df.train <- synth.seeded.400.df[synth.seeded.400.df$ts <= T2.train, ]
+synth.seeded.400.df.train <-
+  synth.seeded.400.df[synth.seeded.400.df$ts <= T2.train, ]
 
 synth.fit.seeded.400 <- Temporal.ETAS(
   total.data = synth.seeded.400.df.train,
@@ -309,7 +320,9 @@ N.fore.seeded.400 <- vapply(
 N.obs <- sum(synth.seeded.400.df$ts >= T1.fore & synth.seeded.400.df$ts <= T2.fore)
 # plot the distribution
 plot.fore.seeded.400 <- ggplot() +
-  geom_histogram(aes(x = N.fore.seeded.400, y = after_stat(density)), binwidth = 1, alpha = 0.7) +
+  geom_histogram(aes(x = N.fore.seeded.400, y = after_stat(density)),
+    binwidth = 1, alpha = 0.7
+  ) +
   geom_vline(xintercept = N.obs, color = "red", linetype = "dashed", size = 1) +
   xlim(0, 800) +
   labs(
@@ -445,13 +458,24 @@ plot.fore.seeded.449
 
 ```{r}
 library(gridExtra)
-q4.synth.plot <- grid.arrange(plot.synth.unseeded, plot.synth.seeded.400, plot.synth.seeded.449, ncol = 1)
-ggsave("q4-synthetic-catalogues.png", q4.synth.plot, width = 11.69, height = 8.27, units = "in")
+q4.synth.plot <- grid.arrange(plot.synth.unseeded,
+  plot.synth.seeded.400,
+  plot.synth.seeded.449,
+  ncol = 1
+)
+ggsave("q4-synthetic-catalogues.png", q4.synth.plot,
+  width = 11.69, height = 8.27, units = "in"
+)
 ```
 
 # stack vertically the plots of the three forecasts
 
 ```{r} 
-q4.fore.plot <- grid.arrange(plot.fore.unseeded, plot.fore.seeded.400, plot.fore.seeded.449, ncol = 1)
-ggsave("q4-forecasts.png", q4.fore.plot, width = 11.69, height = 8.27, units = "in")
+q4.fore.plot <- grid.arrange(plot.fore.unseeded,
+  plot.fore.seeded.400, plot.fore.seeded.449,
+  ncol = 1
+)
+ggsave("q4-forecasts.png", q4.fore.plot,
+  width = 11.69, height = 8.27, units = "in"
+)
 ```

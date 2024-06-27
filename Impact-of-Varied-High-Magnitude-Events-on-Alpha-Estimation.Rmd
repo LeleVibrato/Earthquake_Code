@@ -1,8 +1,10 @@
 ---
-title: "Investigating alpha Estimation with Varied High Magnitude Events"
-format: html
-editor: visual
+title: "Impact of Varied High Magnitude Events on alpha Estimation"
+output: pdf_document
 ---
+
+Author: Zhile Xu
+UUN: s2500393
 
 ```{r}
 # delete all objects in the environment
@@ -119,7 +121,7 @@ synth.cat.df.3 <- generate_synthetic_catalogue(
   M0 = M0,
   T1 = T1,
   T2 = T2,
-    idx = 3,
+  idx = 3,
   Ht = known.events.df.3
 )
 # create a dataframe containing the known events
@@ -159,7 +161,6 @@ synth.cat.list <- list(
   synth.cat.df.4,
   synth.cat.df.5
 )
-
 ```
 
 ```{r}
@@ -181,21 +182,23 @@ plot_synthetic_catalogue <- function(synth.cat.df, title) {
       data = synth.cat.df[synth.cat.df$magnitudes >= 4, ],
       aes(x = ts, y = magnitudes), color = "red"
     ) +
-  theme_bw() +
-  theme(
-   # text = element_text(size = 14),
-    plot.title = element_text(face = "bold"),
-    legend.position = "bottom",
-    strip.background = element_rect(fill = "white", color = "black"),
-    axis.title = element_text(face = "bold")
-  ) +
-  labs(x = "Time [days]", y = "Magnitude") +
-  labs(title = title)+
-  # Add the count of points with magnitudes greater than 4 to the title
-  annotate("text", x = Inf, y = Inf, 
-             label = paste("Count > 4:", count_greater_than_4), 
-             hjust = 1.1, vjust = 1.5, 
-             size = 4, color = "blue", fontface = "bold")
+    theme_bw() +
+    theme(
+      # text = element_text(size = 14),
+      plot.title = element_text(face = "bold"),
+      legend.position = "bottom",
+      strip.background = element_rect(fill = "white", color = "black"),
+      axis.title = element_text(face = "bold")
+    ) +
+    labs(x = "Time [days]", y = "Magnitude") +
+    labs(title = title) +
+    # Add the count of points with magnitudes greater than 4 to the title
+    annotate("text",
+      x = Inf, y = Inf,
+      label = paste("Count > 4:", count_greater_than_4),
+      hjust = 1.1, vjust = 1.5,
+      size = 4, color = "blue", fontface = "bold"
+    )
   return(plt)
 }
 ```
@@ -208,7 +211,10 @@ plots <- lapply(1:length(synth.cat.list), function(i) {
 })
 # Arrange the plots in a column
 plots <- grid.arrange(grobs = plots, ncol = 2)
-ggsave("q1-alpha-catalogue.png", plot = plots, width = 11.69, height = 8.27, units = "in", dpi = 300)
+ggsave("q1-alpha-catalogue.png",
+  plot = plots, width = 11.69,
+  height = 8.27, units = "in", dpi = 300
+)
 ```
 
 ## Prepare the Data for Model Fitting
@@ -240,14 +246,17 @@ plot.violin <- ggplot(synth.cat.df, aes(x = as.factor(idx), y = magnitudes)) +
   theme_bw() +
   theme(
     plot.title = element_text(hjust = 0.5, face = "bold"),
-    axis.title = element_text(face = "bold",size = 15),
+    axis.title = element_text(face = "bold", size = 15),
     axis.text.x = element_text(angle = 45, hjust = 1)
   ) +
   labs(x = "Catalogue Number", y = "Magnitude") # +
-  # ggtitle("Violin Plot of Magnitudes")
+# ggtitle("Violin Plot of Magnitudes")
 
 plot.violin
-ggsave("q1-alpha-violin.png", plot = plot.violin, width = 11.69, height = 8.27, units = "in", dpi = 300)
+ggsave("q1-alpha-violin.png",
+  plot = plot.violin, width = 11.69,
+  height = 8.27, units = "in", dpi = 300
+)
 ```
 
 ## Model Fitting
@@ -374,15 +383,21 @@ ggplot(
     axis.text = element_text(size = 12),
     panel.grid.major = element_line(color = "grey80"),
     panel.grid.minor = element_line(color = "grey90")
-  ) 
+  )
 ```
 
 ```{r}
 # Plot the marginal posteriors of alpha with additional visual enhancements
-plot.posters <- ggplot(bind.post.df[bind.post.df$param == "alpha", ], aes(x = x, y = cat.used)) +
+plot.posters <- ggplot(
+  bind.post.df[bind.post.df$param == "alpha", ],
+  aes(x = x, y = cat.used)
+) +
   stat_slab(aes(fill = after_stat(level)), .width = c(.66, .95, .99, 1)) +
   stat_pointinterval() +
-  scale_fill_brewer(palette = "Blues", na.translate = FALSE, name = "Credible Level") +
+  scale_fill_brewer(
+    palette = "Blues", na.translate = FALSE,
+    name = "Credible Level"
+  ) +
   geom_vline(
     data = df.true.param[df.true.param$param == "alpha", ],
     aes(xintercept = x), linetype = 2, color = "red", size = 1
@@ -402,11 +417,14 @@ plot.posters <- ggplot(bind.post.df[bind.post.df$param == "alpha", ], aes(x = x,
   labs(
     x = expression(alpha),
     y = "Catalogue Used",
-   # title = "Marginal Posterior Distributions of Alpha",
+    # title = "Marginal Posterior Distributions of Alpha",
     fill = "Credible Interval"
   )
 plot.posters
-ggsave("q1-alpha-posteriors.png", plot = plot.posters, width = 11.69, height = 8.27, units = "in", dpi = 300)
+ggsave("q1-alpha-posteriors.png",
+  plot = plot.posters, width = 11.69,
+  height = 8.27, units = "in", dpi = 300
+)
 ```
 
 ```{r}
@@ -439,5 +457,4 @@ ggplot(bind.post.df, aes(x = x, y = cat.used)) +
     fill = "Credible Interval"
   ) +
   facet_wrap(~param, scales = "free", ncol = 3)
-
 ```
